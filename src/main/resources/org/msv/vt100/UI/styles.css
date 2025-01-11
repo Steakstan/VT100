@@ -1,0 +1,40 @@
+/* Styles for the content panel */
+.content-panel {
+    -fx-background-color: TRANSPARENT; /* Solarized Dark background */
+    -fx-text-fill: #839496; /* Solarized base0 */
+}
+
+/* Styles for labels */
+.label-white {
+    -fx-text-fill: #00f1fc; /* Solarized base0 */
+}
+
+/* Styles for ComboBox */
+.combo-box {
+    -fx-background-color: #073642; /* Solarized base02 */
+    -fx-background-radius: 10px;
+}
+
+.combo-box .text {
+    -fx-fill: #839496; /* Changes the text color inside the ComboBox */
+}
+
+/* Styles for TextField */
+.text-field {
+    -fx-background-color: #073642; /* Solarized base02 */
+    -fx-text-fill: #839496; /* Solarized base0 */
+    -fx-background-radius: 10px;
+}
+
+/* Styles for buttons */
+.rounded-button {
+    -fx-background-color: rgba(88, 110, 117, 0.8); /* 80% непрозрачности */
+    -fx-text-fill: #fdf6e3; /* Solarized base2 */
+    -fx-padding: 5 20 5 20;
+    -fx-background-radius: 20px;
+}
+
+.rounded-button:hover {
+    -fx-background-color: rgba(101, 123, 131, 0.8); /* Более темный оттенок при наведении */
+    -fx-effect: dropshadow(gaussian, rgba(253, 246, 227, 0.3), 10, 0.4, 0, 0);
+}
