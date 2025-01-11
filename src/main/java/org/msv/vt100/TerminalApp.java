@@ -28,7 +28,7 @@ public class TerminalApp extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(TerminalApp.class);
     private static final int COLUMNS = 80;
-    private static final int ROWS = 24;
+    private static final int ROWS = 25;
     private InlineCssTextArea terminalArea;
     private Cursor cursor;
     private CursorVisibilityManager cursorVisibilityManager;
