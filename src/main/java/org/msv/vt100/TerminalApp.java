@@ -129,7 +129,7 @@ public class TerminalApp extends Application {
     // Инициализация SSH-соединения
     private void initializeSSH() {
         try {
-            sshConnector = new SSHConnector("MMBFAEXT", "clustr.lutz.gmbh", 22, "C:\\Intel\\Ukraine_PrivateKey_OPENSSH", this);
+            sshConnector = new SSHConnector("MMBFAEXT", "clustr.lutz.gmbh", 22, "D:\\XXXLutz\\Wichtiges\\Ukraine_PrivateKey_OPENSSH", this);
             sshConnector.startSSHConnection();
         } catch (Exception e) {
             logger.error("Ошибка подключения по SSH", e);
@@ -175,11 +175,17 @@ public class TerminalApp extends Application {
             styleSpansBuilder.add(lastStyle, spanLength);
         }
 
+        // Log the full screen output (if debug logging is enabled)
+        if (logger.isDebugEnabled()) {
+            logger.debug("Screen output:\n{}", textBuilder.toString());
+        }
+
         Platform.runLater(() -> {
             terminalArea.replaceText(textBuilder.toString());
             terminalArea.setStyleSpans(0, styleSpansBuilder.create());
         });
     }
+
 
 
 

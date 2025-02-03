@@ -19,12 +19,12 @@ public class DECCRASequenceHandler {
     }
 
     public void handleDECCRA(String sequence) {
-        // Удаляем ESC и '$v'
+        // Remove ESC and "$v"
         String paramsPart = sequence.substring(1, sequence.length() - 2);
         String[] params = paramsPart.split(";");
 
         if (params.length < 8) {
-            logger.warn("Недостаточно параметров для DECCRA: {}", sequence);
+            logger.warn("Not enough parameters for DECCRA: {}", sequence);
             return;
         }
 
@@ -32,6 +32,7 @@ public class DECCRASequenceHandler {
             int maxRows = screenBuffer.getRows();
             int maxCols = screenBuffer.getColumns();
 
+            // Parse source coordinates and destination coordinates using default conversion:
             int Pts = parseParameter(params[0], 1, 1, maxRows);
             int Pls = parseParameter(params[1], 1, 1, maxCols);
             int Pbs = parseParameter(params[2], maxRows, 1, maxRows);
@@ -41,7 +42,7 @@ public class DECCRASequenceHandler {
             int Psrc_page = parseParameter(params[6], 1);
             int Pdst_page = parseParameter(params[7], 1);
 
-            // Убеждаемся, что нижние координаты не меньше верхних
+            // Ensure that lower coordinates are not less than upper ones.
             if (Pbs < Pts) {
                 int temp = Pts;
                 Pts = Pbs;
@@ -53,23 +54,31 @@ public class DECCRASequenceHandler {
                 Prs = temp;
             }
 
-            // Вызываем обработчик DECCRA
+            // If source and destination are on the same page and the destination top is only one row below source,
+            // adjust the destination to avoid shifting the entire text.
+            if (Psrc_page == Pdst_page && Ptd == Pts + 1) {
+                logger.info("Overlapping source and destination on the same page with vertical offset detected; " +
+                        "adjusting destination top row from {} to {} to avoid shifting the text.", Ptd, Pts);
+                Ptd = Pts;
+            }
+
+            // Call the copy area handler with the (possibly adjusted) parameters.
             copyRectangularAreaHandler.copyArea(Pts, Pls, Pbs, Prs, Ptd, Pld, Psrc_page, Pdst_page);
 
             if (shouldSwitchToDestinationPage(Pdst_page)) {
-                // Переключаемся на страницу назначения
+                // Switch to destination page.
                 screenBuffer.switchToPage(Pdst_page);
             } else {
-                // Остаёмся на исходной странице или возвращаемся на неё
+                // Stay on the source page.
                 screenBuffer.switchToPage(Psrc_page);
             }
 
         } catch (NumberFormatException e) {
-            logger.error("Ошибка разбора параметров DECCRA: {}", sequence, e);
+            logger.error("Error parsing DECCRA parameters: {}", sequence, e);
         }
     }
 
-    // Вспомогательный метод для разбора параметров с ограничениями
+    // Helper method with bounds checking.
     private int parseParameter(String param, int defaultValue, int minValue, int maxValue) {
         int value;
         if (param == null || param.isEmpty()) {
@@ -78,12 +87,11 @@ public class DECCRASequenceHandler {
             value = Integer.parseInt(param);
             value = (value == 0) ? defaultValue : value;
         }
-        // Ограничиваем значение в пределах min и max
         value = Math.max(minValue, Math.min(value, maxValue));
         return value;
     }
 
-    // Перегруженный метод для параметров без ограничений
+    // Overloaded helper.
     private int parseParameter(String param, int defaultValue) {
         if (param == null || param.isEmpty()) {
             return defaultValue;
@@ -91,10 +99,9 @@ public class DECCRASequenceHandler {
         int value = Integer.parseInt(param);
         return (value == 0) ? defaultValue : value;
     }
+
     private boolean shouldSwitchToDestinationPage(int Pdst_page) {
-        // Определяем, нужно ли переключаться на страницу назначения
-        // Например, если Pdst_page равно 1 или 2, переключаемся
-        // Если больше 2, считаем, что это буферная страница и не переключаемся
+        // Switch if destination page equals 1 or 2.
         return Pdst_page == 1 || Pdst_page == 2;
     }
 }
