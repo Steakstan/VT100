@@ -5,15 +5,15 @@ import java.util.Map;
 
 public class CharsetSwitchHandler {
 
-    // Enumeration for possible character sets
-    enum CharsetMode {
+    // Перелік можливих наборів символів
+    public enum CharsetMode {
         ASCII, GRAPHICS
     }
 
-    // Current character set
+    // Поточний набір символів
     private CharsetMode currentCharset;
 
-    // Mapping for graphics characters
+    // Таблиця відповідностей для графічних символів
     private static final Map<Character, Character> graphicsCharMap = new HashMap<>();
 
     static {
@@ -28,36 +28,36 @@ public class CharsetSwitchHandler {
         graphicsCharMap.put('v', '┴'); // ┴
         graphicsCharMap.put('w', '┬'); // ┬
         graphicsCharMap.put('x', '│'); // │
-        // Add more mappings as needed
+        // За потреби можна додати інші відповідності
     }
 
     public CharsetSwitchHandler() {
-        // Default to ASCII
+        // За замовчуванням – ASCII
         this.currentCharset = CharsetMode.ASCII;
     }
 
-    // Switch to ASCII charset (ESC (K)
     public void switchToASCIICharset() {
         currentCharset = CharsetMode.ASCII;
     }
 
-    // Switch to graphics charset (ESC (0)
     public void switchToGraphicsCharset() {
         currentCharset = CharsetMode.GRAPHICS;
     }
 
-    // Process text based on current charset
-    public String processText(String text) {
-        switch (currentCharset) {
-            case GRAPHICS:
-                return convertToGraphicsCharset(text);
-            case ASCII:
-            default:
-                return text; // In ASCII mode, return text as is
-        }
+    // Додаємо метод для отримання поточного режиму
+    public CharsetMode getCurrentCharset() {
+        return currentCharset;
     }
 
-    // Convert text to graphics charset
+    // Якщо режим GRAPHICS, для заданого тексту виконуємо конвертацію символів
+    public String processText(String text) {
+        if (currentCharset == CharsetMode.GRAPHICS) {
+            return convertToGraphicsCharset(text);
+        }
+        return text;
+    }
+
+    // Приватний метод конвертації всього рядка (як раніше)
     private String convertToGraphicsCharset(String text) {
         StringBuilder result = new StringBuilder();
 
@@ -68,7 +68,11 @@ public class CharsetSwitchHandler {
                 result.append(currentChar);
             }
         }
-
         return result.toString();
+    }
+
+    // Статичний метод для конвертації одного символу за графічною таблицею
+    public static char convertChar(char c) {
+        return graphicsCharMap.getOrDefault(c, c);
     }
 }

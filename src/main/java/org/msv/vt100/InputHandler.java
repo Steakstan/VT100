@@ -36,7 +36,7 @@ public class InputHandler {
         terminalArea.addEventFilter(KeyEvent.KEY_TYPED, this::handleKeyTyped);
     }
 
-    private void handleKeyPressed(KeyEvent event) {
+    void handleKeyPressed(KeyEvent event) {
         KeyCode code = event.getCode();
 
         // Проверка на сочетание клавиш Ctrl+C и Ctrl+V
@@ -59,7 +59,7 @@ public class InputHandler {
             handleF5KeyPress();}
     }
 
-    private void handleKeyTyped(KeyEvent event) {
+    void handleKeyTyped(KeyEvent event) {
         String character = event.getCharacter();
 
         if (character.isEmpty() || event.isControlDown() || event.isAltDown()) {

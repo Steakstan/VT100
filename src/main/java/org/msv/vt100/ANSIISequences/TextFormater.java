@@ -7,7 +7,7 @@ import java.util.EnumSet;
 
 public class TextFormater {
 
-    // Logger SLF4J
+    // Logger instance for debugging
     private static final Logger logger = LoggerFactory.getLogger(TextFormater.class);
 
     // Enumeration for possible text formatting modes
@@ -17,32 +17,38 @@ public class TextFormater {
         REVERSE_VIDEO,
         BLINK,
         BOLD,
-        CONCEAL // Добавили CONCEAL mode
+        CONCEAL // Added CONCEAL mode
     }
 
     // Set of active formatting modes
     private EnumSet<TextFormatMode> activeFormats;
 
-    // Current style as CSS string
+    // Current style represented as a style string (to be interpreted by the TerminalCanvas renderer)
     private String currentStyle;
 
-    // Reference to LineAttributeHandler
+    // Reference to LineAttributeHandler (to manage line-specific attributes)
     private LineAttributeHandler lineAttributeHandler;
 
     public TextFormater(LineAttributeHandler lineAttributeHandler) {
         this.lineAttributeHandler = lineAttributeHandler;
-        // Default to normal text
+        // Set default mode to NORMAL
         this.activeFormats = EnumSet.of(TextFormatMode.NORMAL);
         updateCurrentStyle();
     }
 
+    /**
+     * Processes the SGR (Select Graphic Rendition) sequence and updates active formatting modes.
+     * This method strips the '[' and 'm' characters and then parses the parameters.
+     *
+     * @param sequence the SGR escape sequence (e.g., "[1;4m")
+     */
     public void handleSgrSequence(String sequence) {
         // Remove '[' and 'm' from the sequence
         String params = sequence.replace("[", "").replace("m", "");
         String[] paramArray = params.split(";");
 
         if (paramArray.length == 0 || paramArray[0].isEmpty()) {
-            // No parameters, reset all attributes
+            // No parameters provided; reset all attributes
             resetAllAttributes();
             return;
         }
@@ -83,98 +89,128 @@ public class TextFormater {
                 case 28:
                     disableConceal();
                     break;
-                // Add handling for other SGR codes as needed
+                // Additional SGR codes can be handled as needed
                 default:
-                    logger.warn("Неизвестный код SGR: {}", code);
+                    logger.warn("Unknown SGR code: {}", code);
                     break;
             }
         }
     }
 
-    // Method to reset all formatting (ESC [0m)
+    /**
+     * Resets all text and line attributes (corresponds to ESC [0m).
+     */
     public void resetAllAttributes() {
         activeFormats.clear();
         activeFormats.add(TextFormatMode.NORMAL);
         updateCurrentStyle();
-        // Reset line attributes
+        // Reset line attributes as well
         lineAttributeHandler.resetAllLineAttributes();
-        logger.info("Все текстовые и строковые атрибуты сброшены.");
+        logger.info("All text and line attributes have been reset.");
     }
 
-    // Methods to enable/disable reverse video
+    /**
+     * Enables reverse video (swaps text and background colors).
+     */
     public void enableReverseVideo() {
         activeFormats.add(TextFormatMode.REVERSE_VIDEO);
         updateCurrentStyle();
-        logger.info("Реверс видео включен.");
+        logger.info("Reverse video enabled.");
     }
 
+    /**
+     * Disables reverse video.
+     */
     public void disableReverseVideo() {
         activeFormats.remove(TextFormatMode.REVERSE_VIDEO);
         updateCurrentStyle();
-        logger.info("Реверс видео отключен.");
+        logger.info("Reverse video disabled.");
     }
 
-    // Methods to enable/disable underline
+    /**
+     * Enables underline formatting.
+     */
     public void enableUnderline() {
         activeFormats.add(TextFormatMode.UNDERLINE);
         updateCurrentStyle();
-        logger.info("Подчёркивание включено.");
+        logger.info("Underline enabled.");
     }
 
+    /**
+     * Disables underline formatting.
+     */
     public void disableUnderline() {
         activeFormats.remove(TextFormatMode.UNDERLINE);
         updateCurrentStyle();
-        logger.info("Подчёркивание отключено.");
+        logger.info("Underline disabled.");
     }
 
-    // Methods to enable/disable blink
+    /**
+     * Enables blinking text.
+     */
     public void enableBlink() {
         activeFormats.add(TextFormatMode.BLINK);
         updateCurrentStyle();
-        logger.info("Мигание включено.");
+        logger.info("Blink enabled.");
     }
 
+    /**
+     * Disables blinking text.
+     */
     public void disableBlink() {
         activeFormats.remove(TextFormatMode.BLINK);
         updateCurrentStyle();
-        logger.info("Мигание отключено.");
+        logger.info("Blink disabled.");
     }
 
-    // Methods to enable/disable bold
+    /**
+     * Enables bold text.
+     */
     public void enableBold() {
         activeFormats.add(TextFormatMode.BOLD);
         updateCurrentStyle();
-        logger.info("Полужирный шрифт включен.");
+        logger.info("Bold text enabled.");
     }
 
+    /**
+     * Disables bold text.
+     */
     public void disableBold() {
         activeFormats.remove(TextFormatMode.BOLD);
         updateCurrentStyle();
-        logger.info("Полужирный шрифт отключен.");
+        logger.info("Bold text disabled.");
     }
 
-    // Methods to enable/disable conceal
+    /**
+     * Enables conceal mode (hides text by making it transparent).
+     */
     public void enableConceal() {
         activeFormats.add(TextFormatMode.CONCEAL);
         updateCurrentStyle();
-        logger.info("Режим скрытого текста включен.");
+        logger.info("Conceal mode enabled.");
     }
 
+    /**
+     * Disables conceal mode.
+     */
     public void disableConceal() {
         activeFormats.remove(TextFormatMode.CONCEAL);
         updateCurrentStyle();
-        logger.info("Режим скрытого текста отключен.");
+        logger.info("Conceal mode disabled.");
     }
 
-    // Method to update current style based on active formats
+    /**
+     * Updates the current style string based on active formatting modes.
+     * This style string is later interpreted by the TerminalCanvas to set drawing parameters.
+     */
     private void updateCurrentStyle() {
         String textColor = "white";
-        String backgroundColor = "rgba(0, 43, 54, 0.0)";
+        String backgroundColor = "transparent";
 
         if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
-            // Invert colors
+            // For reverse video, swap text and background colors
             String temp = textColor;
-            textColor = "BLUE";
+            textColor = "blue"; // You may adjust this to a preferred color
             backgroundColor = temp;
         }
 
@@ -184,27 +220,32 @@ public class TextFormater {
         }
 
         StringBuilder styleBuilder = new StringBuilder();
-        styleBuilder.append("-fx-fill: ").append(textColor).append("; ");
-        styleBuilder.append("-rtfx-background-color: ").append(backgroundColor).append("; ");
+        // The style string format is a simple key-value pair sequence that can be parsed by the canvas renderer.
+        styleBuilder.append("fill: ").append(textColor).append("; ");
+        styleBuilder.append("background: ").append(backgroundColor).append("; ");
 
         if (activeFormats.contains(TextFormatMode.UNDERLINE)) {
-            styleBuilder.append("-fx-underline: true; ");
+            styleBuilder.append("underline: true; ");
         } else {
-            styleBuilder.append("-fx-underline: false; ");
+            styleBuilder.append("underline: false; ");
         }
 
         if (activeFormats.contains(TextFormatMode.BOLD)) {
-            styleBuilder.append("-fx-font-weight: bold; ");
+            styleBuilder.append("font-weight: bold; ");
         } else {
-            styleBuilder.append("-fx-font-weight: normal; ");
+            styleBuilder.append("font-weight: normal; ");
         }
 
-        // Если нужно добавить мигание, потребуется дополнительная логика
+        // Additional formatting options (e.g., blink) can be added here
 
         currentStyle = styleBuilder.toString().trim();
     }
 
-    // Method to get current style
+    /**
+     * Returns the current style string.
+     *
+     * @return the current style string
+     */
     public String getCurrentStyle() {
         return currentStyle;
     }
