@@ -2,8 +2,8 @@ package org.msv.vt100.OrderAutomation;
 
 import javafx.application.Platform;
 import org.apache.poi.ss.usermodel.Row;
-import org.msv.vt100.Cursor;
-import org.msv.vt100.SSHConnector;
+import org.msv.vt100.core.Cursor;
+import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.TerminalApp;
 
 import java.io.IOException;
@@ -11,13 +11,13 @@ import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 
 public class DeliveryDateProcessor {
-    private final SSHConnector sshConnector;
+    private final SSHManager sshConnector;
     private final Cursor cursor;
     private final TerminalApp terminalApp;
     private final ScreenTextDetector screenTextDetector;
 
 
-    public DeliveryDateProcessor(SSHConnector sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
+    public DeliveryDateProcessor(SSHManager sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
         this.sshConnector = sshConnector;
         this.cursor = cursor;
         this.terminalApp = terminalApp;
@@ -165,7 +165,7 @@ public class DeliveryDateProcessor {
             terminalApp.checkForStop();
             sendDataWithDelay("T");
             sendDataWithDelay("\r");
-                Thread.sleep(2500);
+            Thread.sleep(2500);
             label:
             while (true) {
                 terminalApp.checkForStop();
@@ -314,7 +314,7 @@ public class DeliveryDateProcessor {
 
     // Вспомогательный метод для отправки данных с задержкой
     private void sendDataWithDelay(String data) throws IOException, InterruptedException {
-        sshConnector.sendData(data);
+        sshConnector.send(data);
         int sleepTime = 500; // Задержка в 500 мс
         int interval = 50; // Проверяем каждые 50 мс
         int elapsed = 0;

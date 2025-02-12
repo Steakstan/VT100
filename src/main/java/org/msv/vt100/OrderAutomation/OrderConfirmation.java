@@ -2,8 +2,8 @@ package org.msv.vt100.OrderAutomation;
 
 import javafx.application.Platform;
 import org.apache.poi.ss.usermodel.Row;
-import org.msv.vt100.Cursor;
-import org.msv.vt100.SSHConnector;
+import org.msv.vt100.core.Cursor;
+import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.TerminalApp;
 
 import java.io.IOException;
@@ -12,12 +12,12 @@ import java.util.concurrent.CountDownLatch;
 
 public class OrderConfirmation {
 
-    private final SSHConnector sshConnector;
+    private final SSHManager sshConnector;
     private final Cursor cursor;
     private final TerminalApp terminalApp;
     private final ScreenTextDetector screenTextDetector;
 
-    public OrderConfirmation(SSHConnector sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
+    public OrderConfirmation(SSHManager sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
         this.sshConnector = sshConnector;
         this.cursor = cursor;
         this.terminalApp = terminalApp;
@@ -200,7 +200,7 @@ public class OrderConfirmation {
 
     // Вспомогательный метод для отправки данных с задержкой
     private void sendDataWithDelay(String data) throws IOException, InterruptedException {
-        sshConnector.sendData(data);
+        sshConnector.send(data);
         int sleepTime = 300; // Задержка в 300 мс
         int interval = 50; // Проверяем каждые 50 мс
         int elapsed = 0;

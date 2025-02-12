@@ -1,4 +1,12 @@
-package org.msv.vt100.ANSIISequences;
+
+
+
+
+
+
+
+
+package org.msv.vt100.ansiisequences;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +29,13 @@ public class TextFormater {
     }
 
     // Set of active formatting modes
-    private EnumSet<TextFormatMode> activeFormats;
+    private final EnumSet<TextFormatMode> activeFormats;
 
     // Current style represented as a style string (to be interpreted by the TerminalCanvas renderer)
     private String currentStyle;
 
     // Reference to LineAttributeHandler (to manage line-specific attributes)
-    private LineAttributeHandler lineAttributeHandler;
+    private final LineAttributeHandler lineAttributeHandler;
 
     public TextFormater(LineAttributeHandler lineAttributeHandler) {
         this.lineAttributeHandler = lineAttributeHandler;
@@ -250,3 +258,16 @@ public class TextFormater {
         return currentStyle;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

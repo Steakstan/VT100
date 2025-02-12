@@ -1,7 +1,7 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.Cell;
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.Cell;
+import org.msv.vt100.core.ScreenBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,13 +28,13 @@ public class ScrollingRegionHandler {
 
     /**
      * Устанавливает область прокрутки на основе управляющей последовательности ANSI.
+     *
      * @param sequence Последовательность, содержащая границы области прокрутки в формате "[Pt;Pb]r".
-     * @return true, если область прокрутки была успешно установлена; false иначе.
      */
-    public boolean setScrollingRegion(String sequence) {
+    public void setScrollingRegion(String sequence) {
         try {
             // Удаляем ESC, '[', и 'r' для корректного разбора границ
-            sequence = sequence.replaceAll("\\u001B|\\[|r", "");
+            sequence = sequence.replaceAll("[\\u001B\\[r]", "");
             String[] bounds = sequence.split(";");
 
             int totalRows = screenBuffer.getRows();
@@ -49,15 +49,13 @@ public class ScrollingRegionHandler {
 
             if (!isValidScrollingRegion(windowStartRow, windowEndRow)) {
                 logger.warn("Область прокрутки вне допустимого диапазона: {}", sequence);
-                return false;
+                return;
             }
 
             logger.info("Область прокрутки установлена: от строки {} до {} и от {} рядка и до {} рядка ", windowStartRow + 1, windowEndRow + 1, leftRightMarginSequenceHandler.getLeftMargin()+1, leftRightMarginSequenceHandler.getRightMargin()+1);
-            return true;
 
         } catch (NumberFormatException e) {
             logger.error("Неверный формат области прокрутки: {}", sequence, e);
-            return false;
         }
     }
 

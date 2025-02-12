@@ -1,4 +1,4 @@
-package org.msv.vt100.UI;
+package org.msv.vt100.ui;
 
 import javafx.geometry.VPos;
 import javafx.scene.canvas.Canvas;
@@ -7,8 +7,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
-import org.msv.vt100.Cell;
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.Cell;
+import org.msv.vt100.core.ScreenBuffer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,7 +16,6 @@ import java.util.Map;
 public class TerminalCanvas extends Canvas {
 
     private final ScreenBuffer screenBuffer;
-    private Font font;
     private double cellWidth;
     private double cellHeight;
 
@@ -38,7 +37,7 @@ public class TerminalCanvas extends Canvas {
         cellHeight = getHeight() / rows;
         double newFontSize = cellHeight * 0.8;
         // Базовий шрифт – без особливостей форматування, його будемо перевизначати для кожної комірки
-        font = Font.font("Consolas", newFontSize);
+        Font font = Font.font("Consolas", newFontSize);
     }
 
     public void updateScreen() {
@@ -147,55 +146,53 @@ public class TerminalCanvas extends Canvas {
         gc.setStroke(lineColor);
         gc.setLineWidth(2);
 
-        double left   = x;
         double right  = x + w;
-        double top    = y;
         double bottom = y + h;
         double midX   = x + w / 2.0;
         double midY   = y + h / 2.0;
 
         switch (c) {
             case '─': // Горизонтальна лінія
-                gc.strokeLine(left, midY, right, midY);
+                gc.strokeLine(x, midY, right, midY);
                 break;
             case '│': // Вертикальна лінія
-                gc.strokeLine(midX, top, midX, bottom);
+                gc.strokeLine(midX, y, midX, bottom);
                 break;
             case '┌': // Верхній лівий кут
                 gc.strokeLine(midX, midY, right, midY);
                 gc.strokeLine(midX, midY, midX, bottom);
                 break;
             case '┐': // Верхній правий кут
-                gc.strokeLine(left, midY, midX, midY);
+                gc.strokeLine(x, midY, midX, midY);
                 gc.strokeLine(midX, midY, midX, bottom);
                 break;
             case '└': // Нижній лівий кут
-                gc.strokeLine(midX, top, midX, midY);
+                gc.strokeLine(midX, y, midX, midY);
                 gc.strokeLine(midX, midY, right, midY);
                 break;
             case '┘': // Нижній правий кут
-                gc.strokeLine(midX, top, midX, midY);
-                gc.strokeLine(left, midY, midX, midY);
+                gc.strokeLine(midX, y, midX, midY);
+                gc.strokeLine(x, midY, midX, midY);
                 break;
             case '├':
                 gc.strokeLine(midX, midY, right, midY);
-                gc.strokeLine(midX, top, midX, bottom);
+                gc.strokeLine(midX, y, midX, bottom);
                 break;
             case '┤':
-                gc.strokeLine(left, midY, midX, midY);
-                gc.strokeLine(midX, top, midX, bottom);
+                gc.strokeLine(x, midY, midX, midY);
+                gc.strokeLine(midX, y, midX, bottom);
                 break;
             case '┬':
                 gc.strokeLine(midX, midY, midX, bottom);
-                gc.strokeLine(left, midY, right, midY);
+                gc.strokeLine(x, midY, right, midY);
                 break;
             case '┴':
-                gc.strokeLine(midX, top, midX, midY);
-                gc.strokeLine(left, midY, right, midY);
+                gc.strokeLine(midX, y, midX, midY);
+                gc.strokeLine(x, midY, right, midY);
                 break;
             case '┼':
-                gc.strokeLine(left, midY, right, midY);
-                gc.strokeLine(midX, top, midX, bottom);
+                gc.strokeLine(x, midY, right, midY);
+                gc.strokeLine(midX, y, midX, bottom);
                 break;
         }
     }

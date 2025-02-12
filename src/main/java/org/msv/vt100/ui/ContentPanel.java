@@ -1,4 +1,4 @@
-package org.msv.vt100.UI;
+package org.msv.vt100.ui;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -8,6 +8,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.msv.vt100.TerminalApp;
+import org.msv.vt100.core.FileProcessingService;
 
 import java.io.File;
 
@@ -201,7 +202,7 @@ public class ContentPanel extends BorderPane {
         // Run processing in a new thread to avoid freezing the UI
         processingThread = new Thread(() -> {
             try {
-                terminalApp.processFile(choice, filePath);
+                FileProcessingService.processFile(choice, filePath);
                 Platform.runLater(() -> {
                     showAlert(Alert.AlertType.INFORMATION, "Erfolg", "Verarbeitung abgeschlossen.");
                     resetButtons();

@@ -1,7 +1,7 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.Cell;
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
+import org.msv.vt100.core.Cell;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,7 @@ public class CopyRectangularAreaHandler {
         logger.debug("Параметры после корректировки: Pts={}, Pls={}, Pbs={}, Prs={}, Ptd={}, Pld={}, numRows={}, numCols={}",
                 Pts, Pls, Pbs, Prs, Ptd, Pld, numRows, numCols);
 
-        if (!isValidArea(Pts, Pls, numRows, numCols) || !isValidArea(Ptd, Pld, numRows, numCols)) {
+        if (isValidArea(Pts, Pls, numRows, numCols) || isValidArea(Ptd, Pld, numRows, numCols)) {
             logger.warn("Область копирования выходит за пределы экрана");
             return;
         }
@@ -67,8 +67,8 @@ public class CopyRectangularAreaHandler {
     private boolean isValidArea(int rowStart, int colStart, int numRows, int numCols) {
         int maxRows = screenBuffer.getRows();
         int maxCols = screenBuffer.getColumns();
-        return rowStart >= 1 && colStart >= 1
-                && rowStart + numRows - 1 <= maxRows
-                && colStart + numCols - 1 <= maxCols;
+        return rowStart < 1 || colStart < 1
+                || rowStart + numRows - 1 > maxRows
+                || colStart + numCols - 1 > maxCols;
     }
 }

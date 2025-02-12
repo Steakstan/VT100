@@ -1,6 +1,6 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +37,6 @@ public class LeftRightMarginSequenceHandler {
             int right = rightParam > 0 ? rightParam - 1 : screenBuffer.getColumns() - 1; // Если rightParam == 0, устанавливаем максимальное значение
 
             // Проверяем, что left и right находятся в допустимых пределах
-            left = Math.max(0, left);
             right = Math.min(screenBuffer.getColumns() - 1, right);
 
             // Сохраняем значения полей

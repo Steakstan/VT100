@@ -1,6 +1,6 @@
-package org.msv.vt100.UI;
 
-import javafx.beans.value.ChangeListener;
+package org.msv.vt100.ui;
+
 import javafx.geometry.Insets;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
@@ -10,7 +10,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.TerminalApp;
 
 import java.net.URL;
@@ -86,7 +86,7 @@ public class CustomTerminalWindow {
         scene.setFill(Color.TRANSPARENT);
 
         // Підключення CSS (якщо необхідно)
-        URL cssResource = getClass().getResource("/org/msv/vt100/UI/styles.css");
+        URL cssResource = getClass().getResource("/org/msv/vt100/ui/styles.css");
         if (cssResource != null) {
             scene.getStylesheets().add(cssResource.toExternalForm());
         } else {
@@ -104,13 +104,11 @@ public class CustomTerminalWindow {
         scene.widthProperty().addListener((observable, oldValue, newValue) -> {
             double newCanvasWidth = newValue.doubleValue() - SIDE_BORDER_WIDTH;
             terminalCanvas.setWidth(newCanvasWidth);
-            terminalCanvas.updateScreen();
             terminalCanvas.requestFocus();
         });
         scene.heightProperty().addListener((observable, oldValue, newValue) -> {
             double newCanvasHeight = newValue.doubleValue() - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT;
             terminalCanvas.setHeight(newCanvasHeight);
-            terminalCanvas.updateScreen();
             terminalCanvas.requestFocus();
         });
 

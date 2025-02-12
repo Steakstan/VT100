@@ -1,6 +1,6 @@
 package org.msv.vt100.OrderAutomation;
 
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
 
 public class ScreenTextDetector {
 

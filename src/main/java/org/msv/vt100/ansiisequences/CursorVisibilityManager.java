@@ -1,4 +1,4 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -44,9 +44,6 @@ public class CursorVisibilityManager {
         return cursorEnabled && blinkState;
     }
 
-    public void addVisibilityChangeListener(Runnable listener) {
-        visibilityChangeListeners.add(listener);
-    }
 
     private void notifyVisibilityChange() {
         for (Runnable listener : visibilityChangeListeners) {

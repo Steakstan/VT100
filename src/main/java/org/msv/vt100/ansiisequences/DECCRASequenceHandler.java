@@ -1,6 +1,6 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,14 +33,14 @@ public class DECCRASequenceHandler {
             int maxCols = screenBuffer.getColumns();
 
             // Parse source coordinates and destination coordinates using default conversion:
-            int Pts = parseParameter(params[0], 1, 1, maxRows);
-            int Pls = parseParameter(params[1], 1, 1, maxCols);
-            int Pbs = parseParameter(params[2], maxRows, 1, maxRows);
-            int Prs = parseParameter(params[3], maxCols, 1, maxCols);
-            int Ptd = parseParameter(params[4], 1, 1, maxRows);
-            int Pld = parseParameter(params[5], 1, 1, maxCols);
-            int Psrc_page = parseParameter(params[6], 1);
-            int Pdst_page = parseParameter(params[7], 1);
+            int Pts = parseParameter(params[0], 1, maxRows);
+            int Pls = parseParameter(params[1], 1, maxCols);
+            int Pbs = parseParameter(params[2], maxRows, maxRows);
+            int Prs = parseParameter(params[3], maxCols, maxCols);
+            int Ptd = parseParameter(params[4], 1, maxRows);
+            int Pld = parseParameter(params[5], 1, maxCols);
+            int Psrc_page = parseParameter(params[6]);
+            int Pdst_page = parseParameter(params[7]);
 
             // Ensure that lower coordinates are not less than upper ones.
             if (Pbs < Pts) {
@@ -79,7 +79,7 @@ public class DECCRASequenceHandler {
     }
 
     // Helper method with bounds checking.
-    private int parseParameter(String param, int defaultValue, int minValue, int maxValue) {
+    private int parseParameter(String param, int defaultValue, int maxValue) {
         int value;
         if (param == null || param.isEmpty()) {
             value = defaultValue;
@@ -87,17 +87,17 @@ public class DECCRASequenceHandler {
             value = Integer.parseInt(param);
             value = (value == 0) ? defaultValue : value;
         }
-        value = Math.max(minValue, Math.min(value, maxValue));
+        value = Math.max(1, Math.min(value, maxValue));
         return value;
     }
 
     // Overloaded helper.
-    private int parseParameter(String param, int defaultValue) {
+    private int parseParameter(String param) {
         if (param == null || param.isEmpty()) {
-            return defaultValue;
+            return 1;
         }
         int value = Integer.parseInt(param);
-        return (value == 0) ? defaultValue : value;
+        return (value == 0) ? 1 : value;
     }
 
     private boolean shouldSwitchToDestinationPage(int Pdst_page) {

@@ -3,80 +3,105 @@ package org.msv.vt100;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.msv.vt100.ANSIISequences.*;
-import org.msv.vt100.OrderAutomation.DeliveryDateProcessor;
-import org.msv.vt100.OrderAutomation.OrderConfirmation;
+import org.msv.vt100.ansiisequences.*;
 import org.msv.vt100.OrderAutomation.ScreenTextDetector;
-import org.msv.vt100.UI.CustomTerminalWindow;
-import org.msv.vt100.UI.TerminalCanvas;
+import org.msv.vt100.ui.UIController;
+import org.msv.vt100.ui.TerminalCanvas;
+import org.msv.vt100.core.*;
+import org.msv.vt100.ssh.SSHConfig;
+import org.msv.vt100.ssh.SSHManager;
+import org.msv.vt100.core.FileProcessingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 
-import java.io.FileInputStream;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * TerminalApp – главный класс приложения.
+ * Здесь происходит:
+ * <ul>
+ *   <li>Инициализация логики терминала (курсора, буфера экрана, обработчиков escape‑последовательностей и т.д.)</li>
+ *   <li>Инициализация пользовательского интерфейса через UIController</li>
+ *   <li>Запуск SSH‑соединения через новый сервис SSHManager</li>
+ *   <li>Обработка входящих данных (в том числе разбора escape‑последовательностей) и файловой логики через FileProcessingService</li>
+ * </ul>
+ */
 public class TerminalApp extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(TerminalApp.class);
     private static final int COLUMNS = 80;
     private static final int ROWS = 25;
 
-    // Замість InlineCssTextArea використовується CustomTerminalWindow, який містить TerminalCanvas
-    private CustomTerminalWindow customTerminalWindow;
-
-    // Основні компоненти логіки термінала
+    // Компоненты логики терминала
     private Cursor cursor;
     private CursorVisibilityManager cursorVisibilityManager;
     private ScreenBuffer screenBuffer;
-    private EscapeSequenceHandler escapeSequenceHandler;
-    private SSHConnector sshConnector;
-    private CharsetSwitchHandler charsetSwitchHandler;
     private TextFormater textFormater;
-    private NrcsHandler nrcsHandler;
-    private CursorController cursorController;
     private ScreenTextDetector screenTextDetector;
+    private InputProcessor inputProcessor;
+    private UIController uiController;
 
-    // Обробка процесу (наприклад, для операцій із Excel)
-    private Thread processingThread;
+    // Новый SSH-сервис
+    private SSHManager sshManager;
+
+    // Флаги управления процессами
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
     private final ReentrantLock pauseLock = new ReentrantLock();
     private final Object pauseCondition = new Object();
 
-    // Escape-послідовності
-    private boolean inEscapeSequence = false;
-    private boolean inDCSSequence = false;
-    private StringBuilder escapeSequence = new StringBuilder();
-
-    // Логування
+    // Логирование
     private boolean isLoggingEnabled = false;
 
     @Override
     public void start(Stage primaryStage) {
-        initializeSSH();
+        initializeSSHManager();
         initializeComponents();
         initializeUI(primaryStage);
-        // Вмикаємо курсор (це встановлює cursorEnabled у true)
+        initializeFileProcessingService();
         cursorVisibilityManager.showCursor();
 
-        primaryStage.setOnCloseRequest(event -> sshConnector.disconnect());
-
-        // Встановлюємо фокус на Canvas
-        Platform.runLater(() -> customTerminalWindow.getTerminalCanvas().requestFocus());
+        primaryStage.setOnCloseRequest(event -> {
+            if (sshManager != null) {
+                sshManager.disconnect();
+            }
+        });
+        Platform.runLater(() -> uiController.getTerminalCanvas().requestFocus());
+        startScreenUpdater();
     }
 
+    /**
+     * Инициализирует SSHManager.
+     */
+    private void initializeSSHManager() {
+        try {
+            SSHConfig config = new SSHConfig("MMBFAEXT", "clustr.lutz.gmbh", 22, "D:\\XXXLutz\\Wichtiges\\Ukraine_PrivateKey_OPENSSH");
+            sshManager = new SSHManager(config);
+            sshManager.addDataListener(data -> Platform.runLater(() -> processInput(data.toCharArray())));
+            sshManager.connectAsync().exceptionally(ex -> {
+                logger.error("Ошибка подключения по SSH", ex);
+                return null;
+            });
+        } catch (Exception e) {
+            logger.error("Ошибка при инициализации SSHManager", e);
+        }
+    }
+
+    /**
+     * Инициализирует основные компоненты терминальной логики.
+     */
     private void initializeComponents() {
         cursor = new Cursor(ROWS, COLUMNS);
         cursorVisibilityManager = new CursorVisibilityManager();
         screenBuffer = new ScreenBuffer(ROWS, COLUMNS);
-        nrcsHandler = new NrcsHandler();
-        charsetSwitchHandler = new CharsetSwitchHandler();
+        NrcsHandler nrcsHandler = new NrcsHandler();
+        CharsetSwitchHandler charsetSwitchHandler = new CharsetSwitchHandler();
         LineAttributeHandler lineAttributeHandler = new LineAttributeHandler();
         textFormater = new TextFormater(lineAttributeHandler);
 
@@ -85,7 +110,7 @@ public class TerminalApp extends Application {
         DECOMHandler decomHandler = new DECOMHandler();
         cursorVisibilityManager.initializeCursorBlinking();
 
-        cursorController = new CursorController(
+        CursorController cursorController = new CursorController(
                 cursor, screenBuffer, leftRightMarginModeHandler, decomHandler, lineAttributeHandler
         );
 
@@ -108,7 +133,7 @@ public class TerminalApp extends Application {
         CopyRectangularAreaHandler copyRectangularAreaHandler = new CopyRectangularAreaHandler(screenBuffer);
         EraseCharacterHandler eraseCharacterHandler = new EraseCharacterHandler(screenBuffer, cursor, leftRightMarginModeHandler);
 
-        escapeSequenceHandler = new EscapeSequenceHandler(
+        EscapeSequenceHandler escapeSequenceHandler = new EscapeSequenceHandler(
                 erasingSequences, cursorMovementHandler, decomHandler, scrollingHandler,
                 charsetSwitchHandler, cursorVisibilityManager, textFormater, nrcsHandler,
                 cursorController, leftRightMarginModeHandler, copyRectangularAreaHandler,
@@ -117,153 +142,56 @@ public class TerminalApp extends Application {
         );
         screenTextDetector = new ScreenTextDetector(screenBuffer);
 
-        // Додаємо оновлення екрана при зміні видимості курсора
-        cursorVisibilityManager.addVisibilityChangeListener(this::updateScreen);
+        inputProcessor = new InputProcessor(
+                escapeSequenceHandler,
+                cursorController,
+                nrcsHandler,
+                charsetSwitchHandler,
+                textFormater,
+                this::handleBackspace
+        );
     }
 
+    /**
+     * Инициализирует UIController и отображает окно.
+     */
     private void initializeUI(Stage primaryStage) {
-        // Створюємо CustomTerminalWindow з використанням TerminalCanvas
-        customTerminalWindow = new CustomTerminalWindow(primaryStage, this, screenBuffer);
-
-        // Створюємо InputHandler і прикріплюємо обробку клавіш до TerminalCanvas
-        InputHandler inputHandler = new InputHandler(this, sshConnector, screenBuffer, cursor);
-        customTerminalWindow.getTerminalCanvas().setOnKeyPressed(inputHandler::handleKeyPressed);
-        customTerminalWindow.getTerminalCanvas().setOnKeyTyped(inputHandler::handleKeyTyped);
-
-        customTerminalWindow.configureStage(primaryStage);
-        primaryStage.show();
+        uiController = new UIController(primaryStage, this, screenBuffer, sshManager, cursor);
+        uiController.show();
     }
 
-    private void initializeSSH() {
-        try {
-            sshConnector = new SSHConnector("MMBFAEXT", "clustr.lutz.gmbh", 22,
-                    "D:\\XXXLutz\\Wichtiges\\Ukraine_PrivateKey_OPENSSH", this);
-            sshConnector.startSSHConnection();
-        } catch (Exception e) {
-            logger.error("Error establishing SSH connection", e);
-        }
+    /**
+     * Инициализирует FileProcessingService для обработки Excel-файлов.
+     */
+    private void initializeFileProcessingService() {
+        // Сервис обработки Excel файлов
+        FileProcessingService fileProcessingService = new FileProcessingService(sshManager, cursor, this, screenTextDetector, isPaused, isStopped);
     }
 
-    // Оновлення екрану через Canvas: оновлюємо позицію курсора і стан видимості
+    /**
+     * Обновляет экран: устанавливает позицию курсора и перерисовывает TerminalCanvas.
+     */
     public void updateScreen() {
-        TerminalCanvas canvas = customTerminalWindow.getTerminalCanvas();
-        // Оновлюємо позицію курсора із значень, що зберігаються в об'єкті cursor
+        TerminalCanvas canvas = uiController.getTerminalCanvas();
         canvas.setCursorPosition(cursor.getRow(), cursor.getColumn());
-        // Встановлюємо прапорець видимості курсора згідно з логікою CursorVisibilityManager
         canvas.cursorVisible = cursorVisibilityManager.isCursorVisible();
-        // Оновлюємо екран (забезпечуємо виконання на FX-потоці)
-        Platform.runLater(() -> canvas.updateScreen());
+        canvas.updateScreen();  // Отрисовка канвы
     }
 
-    // Метод для додавання тексту до екранного буфера
-    private void addTextToBuffer(String input) {
-        // Попередня обробка через CharsetSwitchHandler
-        String processedInput = charsetSwitchHandler.processText(input);
-        for (int offset = 0; offset < processedInput.length(); ) {
-            int codePoint = processedInput.codePointAt(offset);
-            String currentChar = new String(Character.toChars(codePoint));
-            String currentStyle = textFormater.getCurrentStyle();
-            cursorController.handleCharacter(currentChar, currentStyle);
-            offset += Character.charCount(codePoint);
-        }
+    // Метод для старта таймера обновления экрана
+    private void startScreenUpdater() {
+        Timeline screenUpdateTimeline = new Timeline(
+                new KeyFrame(Duration.millis(33), event -> updateScreen())
+        );
+        screenUpdateTimeline.setCycleCount(Timeline.INDEFINITE);
+        screenUpdateTimeline.play();
     }
 
-
-    // Обробка вхідних даних (escape-послідовності та звичайний текст)
+    /**
+     * Делегирует обработку входящего массива символов InputProcessor.
+     */
     public void processInput(char[] inputChars) {
-        for (int i = 0; i < inputChars.length; i++) {
-            char currentChar = inputChars[i];
-            if (inDCSSequence) {
-                if (currentChar == '\u001B') {
-                    if (i + 1 < inputChars.length) {
-                        char nextChar = inputChars[i + 1];
-                        if (nextChar == '\\') {
-                            escapeSequence.append(currentChar);
-                            escapeSequence.append(nextChar);
-                            inDCSSequence = false;
-                            escapeSequence.setLength(0);
-                            i++;
-                        } else {
-                            inDCSSequence = false;
-                            escapeSequence.setLength(0);
-                            inEscapeSequence = true;
-                            escapeSequence.append(currentChar);
-                        }
-                    } else {
-                        escapeSequence.append(currentChar);
-                    }
-                } else {
-                    escapeSequence.append(currentChar);
-                }
-            } else if (inEscapeSequence) {
-                escapeSequence.append(currentChar);
-                if (escapeSequenceHandler.isEndOfSequence(escapeSequence)) {
-                    escapeSequenceHandler.processEscapeSequence(escapeSequence.toString());
-                    inEscapeSequence = false;
-                    escapeSequence.setLength(0);
-                } else if (escapeSequence.toString().startsWith("\u001BP")) {
-                    inEscapeSequence = false;
-                    inDCSSequence = true;
-                }
-            } else if (currentChar == '\u001B') {
-                inEscapeSequence = true;
-                escapeSequence.setLength(0);
-                escapeSequence.append(currentChar);
-            } else if (currentChar == '\r') {
-                cursorController.moveCursorToLineStart();
-            } else if (currentChar == '\n') {
-                cursorController.moveCursorDown();
-            } else if (currentChar == '\b') {
-                handleBackspace();
-                updateScreen();
-            } else {
-                String processedChar = nrcsHandler.processText(
-                        charsetSwitchHandler.processText(String.valueOf(currentChar))
-                );
-                addTextToBuffer(processedChar);
-            }
-        }
-    }
-
-    public void processFile(int choice, String excelFilePath) throws InterruptedException {
-        logger.info("Opening Excel file: {}", excelFilePath);
-        isPaused.set(false);
-        isStopped.set(false);
-        try (FileInputStream fileInputStream = new FileInputStream(excelFilePath);
-             Workbook workbook = new XSSFWorkbook(fileInputStream)) {
-
-            Sheet sheet = workbook.getSheetAt(0);
-            Row firstRow = sheet.getRow(0);
-            if (firstRow == null) {
-                logger.error("Excel file is empty. Exiting.");
-                return;
-            }
-
-            int columnCount = firstRow.getLastCellNum();
-            if (choice == 1 && columnCount < 3) {
-                logger.error("Table format incorrect for order processing. Expected 3+ columns.");
-                return;
-            } else if ((choice == 2 || choice == 3) && columnCount != 2) {
-                logger.error("Table format incorrect for comment processing. Expected 2 columns.");
-                return;
-            } else if (choice == 4 && columnCount < 3) {
-                logger.error("Table format incorrect for delivery date processing. Expected 3+ columns.");
-                return;
-            }
-
-            Iterator<Row> rows = sheet.iterator();
-            if (choice == 1) {
-                OrderConfirmation orderConfirmation = new OrderConfirmation(sshConnector, cursor, this, screenTextDetector);
-                orderConfirmation.processOrders(rows);
-            } else if (choice == 4) {
-                DeliveryDateProcessor deliveryDateProcessor = new DeliveryDateProcessor(sshConnector, cursor, this, screenTextDetector);
-                deliveryDateProcessor.processDeliveryDates(rows);
-            } else {
-                // Additional processing if needed
-            }
-        } catch (Exception e) {
-            logger.error("Error processing file: {}", excelFilePath, e);
-        }
+        inputProcessor.processInput(inputChars);
     }
 
     public void pauseProcessing() {
@@ -301,20 +229,19 @@ public class TerminalApp extends Application {
         return isStopped.get();
     }
 
-    // Метод для отримання вибраного тексту – для Canvas не реалізовано
     public String getSelectedText() {
         return "";
     }
 
     public void enableLogging() {
         isLoggingEnabled = true;
-        logger.info("Logging enabled.");
+        logger.info("Логирование включено.");
         setLoggingLevel(Level.DEBUG);
     }
 
     public void disableLogging() {
         isLoggingEnabled = false;
-        logger.info("Logging disabled.");
+        logger.info("Логирование отключено.");
         setLoggingLevel(Level.OFF);
     }
 
@@ -324,22 +251,19 @@ public class TerminalApp extends Application {
         rootLogger.setLevel(level);
     }
 
-    public boolean isLoggingEnabled() {
-        return isLoggingEnabled;
-    }
-
     public void handleBackspace() {
         if (cursor.getColumn() > 0) {
             cursor.moveLeft();
-            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new Cell(" ", textFormater.getCurrentStyle()));
+            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
         } else if (cursor.getRow() > 0) {
             cursor.setPosition(cursor.getRow() - 1, screenBuffer.getColumns() - 1);
-            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new Cell(" ", textFormater.getCurrentStyle()));
+            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
         }
     }
+
     public void checkForStop() throws InterruptedException {
         if (isStopped.get() || Thread.currentThread().isInterrupted()) {
-            throw new InterruptedException("Processing stopped");
+            throw new InterruptedException("Обработка остановлена");
         }
     }
 

@@ -1,6 +1,17 @@
-package org.msv.vt100;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.ANSIISequences.*;
+import org.msv.vt100.OrderAutomation.*;
+import org.msv.vt100.ansiisequences.FillRectangularAreaHandler;
+import org.msv.vt100.ansiisequences.InsertLineHandler;
+import org.msv.vt100.ansiisequences.LeftRightMarginModeHandler;
+import org.msv.vt100.ansiisequences.LeftRightMarginSequenceHandler;
+import org.msv.vt100.ansiisequences.LineAttributeHandler;
+import org.msv.vt100.ansiisequences.NrcsHandler;
+import org.msv.vt100.ansiisequences.ScrollingRegionHandler;
+import org.msv.vt100.ansiisequences.TextFormater;
+import org.msv.vt100.core.Cursor;
+import org.msv.vt100.TerminalApp;
+import org.msv.vt100.core.ScreenBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,13 +34,11 @@ public class EscapeSequenceHandler {
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
     private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler;
     private final DECCRASequenceHandler deccraSequenceHandler; // Новый обработчик
-    private final CopyRectangularAreaHandler copyRectangularAreaHandler;
     private final TerminalApp terminalApp;
     private final EraseCharacterHandler eraseCharacterHandler;
     private final FillRectangularAreaHandler fillRectangularAreaHandler;
     private final Cursor cursor;
     private final LineAttributeHandler lineAttributeHandler;
-    private final ScreenBuffer screenBuffer;
     private final InsertLineHandler insertLineHandler;
 
     public EscapeSequenceHandler(
@@ -62,13 +71,11 @@ public class EscapeSequenceHandler {
         this.nrcsHandler = nrcsHandler;
         this.cursorController = cursorController;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
-        this.copyRectangularAreaHandler = copyRectangularAreaHandler;
         this.terminalApp = terminalApp;
         this.eraseCharacterHandler = eraseCharacterHandler;
         this.fillRectangularAreaHandler = fillRectangularAreaHandler;
         this.cursor = cursor;
         this.lineAttributeHandler = lineAttributeHandler;
-        this.screenBuffer = screenBuffer;
         this.deccraSequenceHandler = new DECCRASequenceHandler(
                 copyRectangularAreaHandler,
                 screenBuffer
@@ -158,7 +165,6 @@ public class EscapeSequenceHandler {
                 else if (sequence.matches("\\[\\d+;\\d+H")) {
                     // Handle cursor movement
                     cursorMovementHandler.handleCursorMovement(sequence);
-                    terminalApp.updateScreen();
                 }
                 else if (sequence.matches("\\[([0-9;]*?)\\$x")) {
                     // Handle DECFRA (Fill Rectangular Area)
@@ -201,7 +207,7 @@ public class EscapeSequenceHandler {
         }
     }
 
-    boolean isEndOfSequence(StringBuilder currentSequence) {
+    public boolean isEndOfSequence(StringBuilder currentSequence) {
         String currentSeqString = currentSequence.toString();
 
         // Проверка для последовательностей, где могут быть цифры

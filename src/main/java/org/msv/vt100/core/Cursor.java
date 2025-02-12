@@ -1,4 +1,4 @@
-package org.msv.vt100;
+package org.msv.vt100.core;
 
 import java.util.HashMap;
 import java.util.Map;

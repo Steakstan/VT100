@@ -1,10 +1,10 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
 import java.util.HashSet;
 import java.util.Set;
 
 public class LineAttributeHandler {
-    private Set<Integer> doubleWidthLines;
+    private final Set<Integer> doubleWidthLines;
 
     public LineAttributeHandler() {
         doubleWidthLines = new HashSet<>();
@@ -32,4 +32,3 @@ public class LineAttributeHandler {
         }
     }
 }
-

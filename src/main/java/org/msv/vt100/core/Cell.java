@@ -1,8 +1,8 @@
-package org.msv.vt100;
+package org.msv.vt100.core;
 
 public class Cell {
-    private String character; // Изменено с char на String
-    private String style;
+    private final String character; // Изменено с char на String
+    private final String style;
 
     public Cell(String character, String style) {
         this.character = character;

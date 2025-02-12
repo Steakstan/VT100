@@ -13,4 +13,10 @@ module org.msv.vt100 {
 
     opens org.msv.vt100 to javafx.fxml;
     exports org.msv.vt100;
+    exports org.msv.vt100.ssh;
+    opens org.msv.vt100.ssh to javafx.fxml;
+    exports org.msv.vt100.ansiisequences;
+    opens org.msv.vt100.ansiisequences to javafx.fxml;
+    exports org.msv.vt100.core;
+    opens org.msv.vt100.core to javafx.fxml;
 }

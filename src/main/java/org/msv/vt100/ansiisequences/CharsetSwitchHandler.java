@@ -1,4 +1,4 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
 import java.util.HashMap;
 import java.util.Map;

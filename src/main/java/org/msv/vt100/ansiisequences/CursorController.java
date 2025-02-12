@@ -1,8 +1,8 @@
-package org.msv.vt100.ANSIISequences;
+package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.Cell;
-import org.msv.vt100.Cursor;
-import org.msv.vt100.ScreenBuffer;
+import org.msv.vt100.core.ScreenBuffer;
+import org.msv.vt100.core.Cell;
+import org.msv.vt100.core.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,6 @@ public class CursorController {
                             LineAttributeHandler lineAttributeHandler) {
         this.cursor = cursor;
         this.screenBuffer = screenBuffer;
-        this.scrollingRegionHandler = scrollingRegionHandler;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
         this.decomHandler = decomHandler;
         this.rightMargin = screenBuffer.getColumns() - 1;
