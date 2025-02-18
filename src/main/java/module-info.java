@@ -7,8 +7,9 @@ module org.msv.vt100 {
     requires ch.qos.logback.core;
     requires org.fxmisc.richtext;
     requires org.apache.poi.ooxml;
-    requires java.logging;
     requires ch.qos.logback.classic;
+    requires com.google.gson;
+    requires java.prefs;
 
 
     opens org.msv.vt100 to javafx.fxml;

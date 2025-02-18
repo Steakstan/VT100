@@ -1,8 +1,6 @@
 package org.msv.vt100.core;
 
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.msv.vt100.OrderAutomation.DeliveryDateProcessor;
 import org.msv.vt100.OrderAutomation.OrderConfirmation;
@@ -11,64 +9,36 @@ import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.TerminalApp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.FileInputStream;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * FileProcessingService инкапсулирует логику обработки Excel-файлов.
- * В зависимости от переданного параметра (choice) выбирается соответствующая
- * обработка (например, OrderConfirmation для заказов или DeliveryDateProcessor для дат поставки).
- * Зависимости (SSHManager, Cursor, TerminalApp и ScreenTextDetector) передаются через конструктор,
- * что позволяет отделить логику обработки файлов от остальной логики терминала.
- */
 public class FileProcessingService {
 
     private static final Logger logger = LoggerFactory.getLogger(FileProcessingService.class);
 
-    private static SSHManager sshManager = null;
-    private static Cursor cursor = null;
-    private static TerminalApp terminalApp = null;
-    private static ScreenTextDetector screenTextDetector = null;
-    private static AtomicBoolean isPaused = null;
-    private static AtomicBoolean isStopped = null;
+    private SSHManager sshManager;
+    private Cursor cursor;
+    private TerminalApp terminalApp;
+    private ScreenTextDetector screenTextDetector;
+    private AtomicBoolean isPaused;
+    private AtomicBoolean isStopped;
 
-    /**
-     * Конструктор FileProcessingService.
-     *
-     * @param sshManager         объект SSHManager для передачи в обработчики заказов
-     * @param cursor             объект Cursor, управляющий положением курсора
-     * @param terminalApp        координатор (TerminalApp) для вызова методов вроде checkForStop()
-     * @param screenTextDetector объект для определения отображаемых на экране текстовых маркеров
-     * @param isPaused           флаг паузы обработки
-     * @param isStopped          флаг остановки обработки
-     */
     public FileProcessingService(SSHManager sshManager,
                                  Cursor cursor,
                                  TerminalApp terminalApp,
                                  ScreenTextDetector screenTextDetector,
                                  AtomicBoolean isPaused,
                                  AtomicBoolean isStopped) {
-        FileProcessingService.sshManager = sshManager;
-        FileProcessingService.cursor = cursor;
-        FileProcessingService.terminalApp = terminalApp;
-        FileProcessingService.screenTextDetector = screenTextDetector;
-        FileProcessingService.isPaused = isPaused;
-        FileProcessingService.isStopped = isStopped;
+        this.sshManager = sshManager;
+        this.cursor = cursor;
+        this.terminalApp = terminalApp;
+        this.screenTextDetector = screenTextDetector;
+        this.isPaused = isPaused;
+        this.isStopped = isStopped;
     }
 
-    /**
-     * Обрабатывает Excel-файл по заданной операции.
-     * Для choice == 1 используется OrderConfirmation,
-     * для choice == 4 – DeliveryDateProcessor.
-     * Если формат файла неверен, выводится сообщение об ошибке.
-     *
-     * @param choice         выбранная операция
-     * @param excelFilePath  путь к Excel-файлу
-     * @throws InterruptedException если поток прерван (например, при остановке обработки)
-     */
-    public static void processFile(int choice, String excelFilePath) throws InterruptedException {
+    public void processFile(int choice, String excelFilePath) throws InterruptedException {
         logger.info("Открытие Excel файла: {}", excelFilePath);
         isPaused.set(false);
         isStopped.set(false);

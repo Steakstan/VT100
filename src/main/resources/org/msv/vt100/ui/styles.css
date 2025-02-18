@@ -1,40 +1,148 @@
-/* Styles for the content panel */
-.content-panel {
-    -fx-background-color: TRANSPARENT; /* Solarized Dark background */
-    -fx-text-fill: #839496; /* Solarized base0 */
+/* Основной фон окна – непрозрачный с закруглёнными углами */
+.root {
+    -fx-background-color: #002B36; /* основной фон (темно-синий/зелёный тон) */
+    -fx-background-radius: 15;
+    -fx-border-radius: 15;
 }
 
-/* Styles for labels */
-.label-white {
-    -fx-text-fill: #00f1fc; /* Solarized base0 */
+/* Панель меню, содержащая кнопки "Datei", "Bearbeiten", "Log" */
+.optional-menu-topbar {
+    -fx-background-color: #073642;
+    -fx-background-radius: 0; /* прямоугольные углы */
 }
 
-/* Styles for ComboBox */
-.combo-box {
-    -fx-background-color: #073642; /* Solarized base02 */
-    -fx-background-radius: 10px;
+/* Кнопки меню */
+.menu-button {
+    -fx-background-color: #073642;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 5 10 5 10;
+    -fx-border-color: transparent;
 }
 
-.combo-box .text {
-    -fx-fill: #839496; /* Changes the text color inside the ComboBox */
+.menu-button:hover {
+    -fx-background-color: #586e75;
 }
 
-/* Styles for TextField */
-.text-field {
-    -fx-background-color: #073642; /* Solarized base02 */
-    -fx-text-fill: #839496; /* Solarized base0 */
-    -fx-background-radius: 10px;
+/* Кнопки управления окном (свернуть, развернуть, закрыть) */
+.top-bar-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-pref-width: 30;
+    -fx-pref-height: 30;
+    -fx-cursor: hand;
 }
 
-/* Styles for buttons */
-.rounded-button {
-    -fx-background-color: rgba(88, 110, 117, 0.8); /* 80% непрозрачности */
-    -fx-text-fill: #fdf6e3; /* Solarized base2 */
-    -fx-padding: 5 20 5 20;
-    -fx-background-radius: 20px;
+.top-bar-button:hover {
+    -fx-background-color: #586e75;
 }
 
-.rounded-button:hover {
-    -fx-background-color: rgba(101, 123, 131, 0.8); /* Более темный оттенок при наведении */
-    -fx-effect: dropshadow(gaussian, rgba(253, 246, 227, 0.3), 10, 0.4, 0, 0);
+.top-bar-button.close:hover {
+    -fx-background-color: red;
 }
+
+
+.top-bar-button:hover {
+    -fx-background-color: #586e75;
+}
+
+/* При наведении на кнопку закрытия – фон становится красным */
+.top-bar-button.close:hover {
+    -fx-background-color: red;
+}
+
+
+
+/* Пример для элементов меню – чтобы при наведении подсветка занимала всю ширину контейнера */
+.menu-item {
+    -fx-background-color: transparent;
+}
+.menu-item:hover {
+    -fx-background-color: #586e75;
+}
+
+.popup-container {
+    -fx-background-color: #073642;
+    -fx-background-radius: 15;
+    -fx-padding: 10;
+    -fx-effect: dropshadow(gaussian, whitesmoke, 10, 0.5, 0, 0);
+}
+
+/* Общий фон для корневого узла диалога */
+.root-dialog {
+    -fx-background-color: transparent;
+}
+
+/* Заголовок диалога */
+.dialog-header {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-background-radius: 15 15 0 0;
+    -fx-padding: 5 10 5 10;
+    -fx-alignment: center-left;
+}
+
+/* Заголовок: текст белый, размер шрифта 14px */
+.dialog-header-title {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+}
+
+/* Кнопка закрытия в заголовке */
+.dialog-header-close-button {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-background-radius: 5;
+}
+
+/* При наведении на кнопку закрытия фон становится красным */
+.dialog-header-close-button:hover {
+    -fx-background-color: red;
+    -fx-text-fill: white;
+}
+
+/* Основное содержимое диалога – grid */
+.dialog-grid {
+    -fx-background-color: rgb(0, 43, 54);
+    -fx-background-radius: 0 0 15 15;
+    -fx-border-color: rgb(2, 23, 28);
+    -fx-border-width: 2;
+    -fx-border-radius: 0 0 15 15;
+    -fx-padding: 10;
+    -fx-hgap: 10;
+    -fx-vgap: 10;
+}
+
+/* Метки для полей (Log Path, Enable Logging) – бирюзовые */
+.dialog-label-turquoise {
+    -fx-text-fill: turquoise;
+    -fx-font-size: 12px;
+}
+
+/* Поле ввода лог-пути */
+.dialog-text-field {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-text-fill: white;
+    -fx-border-color: white;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-pref-width: 300;
+}
+
+/* Общий стиль для кнопок диалога */
+.dialog-button {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-pref-width: 100;
+    -fx-pref-height: 30;
+}
+
+/* При наведении на кнопки происходит инверсия цветов */
+.dialog-button:hover {
+    -fx-background-color: white;
+    -fx-text-fill: rgb(2, 23, 28);
+}
+

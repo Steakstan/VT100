@@ -1,17 +1,18 @@
-
 package org.msv.vt100.ui;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBoxBase;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.TerminalApp;
+import org.msv.vt100.core.ScreenBuffer;
 
 import java.net.URL;
 
@@ -22,22 +23,20 @@ public class CustomTerminalWindow {
     private final Scene scene;
     private final Stage primaryStage;
     private final TerminalApp terminalApp;
+    private ContentPanel contentPanel;
 
-    // Параметри для переміщення вікна
+    // Параметры для перемещения окна
     private double xOffset = 0;
     private double yOffset = 0;
 
-    // Параметри для зміни розміру вікна
+    // Параметры для изменения размера окна
     private double initX, initY, initWidth, initHeight;
     private static final int RESIZE_MARGIN = 8;
     private ResizeDirection resizeDir = ResizeDirection.NONE;
+    private static final int TOP_BAR_HEIGHT = 30;
+    private static final int BOTTOM_BAR_HEIGHT = 60;
 
-    // Фіксовані розміри панелей та рамок
-    private final double TOP_BAR_HEIGHT = 30;
-    private final double BOTTOM_BAR_HEIGHT = 200;
-    private final double SIDE_BORDER_WIDTH = 3 * 2; // 3 пікселі з кожного боку
-
-    // Напрямки зміни розміру
+    // Направления изменения размера
     private enum ResizeDirection {
         NONE, NORTH, SOUTH, EAST, WEST, NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST
     }
@@ -46,18 +45,25 @@ public class CustomTerminalWindow {
         this.primaryStage = primaryStage;
         this.terminalApp = terminalApp;
 
-        // Початкові розміри канви (вони будуть адаптовані при зміні розміру)
+        // Создаем терминальную канву
         double initialCanvasWidth = screenBuffer.getColumns() * 10;
         double initialCanvasHeight = screenBuffer.getRows() * 20;
         terminalCanvas = new TerminalCanvas(screenBuffer, initialCanvasWidth, initialCanvasHeight);
+        terminalCanvas.setFocusTraversable(true);
 
-        // Створення верхньої панелі з прозорим фоном
+        // Создаем верхнюю панель: topBar + OptionalMenuBar
         HBox topBar = createTopBar();
+        OptionalMenuBar optionalMenuBar = new OptionalMenuBar(primaryStage, terminalApp);
+        // Добавляем CSS класс, чтобы в стилевом файле задать для него прямоугольные углы
+        optionalMenuBar.getStyleClass().add("optional-menu-topbar");
 
-        // Створення нижньої панелі з прозорим фоном
+        VBox topContainer = new VBox();
+        topContainer.getChildren().addAll(topBar, optionalMenuBar);
+
+        // Нижняя панель для ContentPanel (например, кнопки Pause/Stop)
         HBox bottomBar = createBottomBar();
 
-        // Лівий і правий бордюри з 50% прозорістю
+        // Боковые рамки
         Region leftBorder = new Region();
         leftBorder.setPrefWidth(3);
         Region rightBorder = new Region();
@@ -66,43 +72,50 @@ public class CustomTerminalWindow {
         leftBorder.setBackground(new Background(new BackgroundFill(borderColor, CornerRadii.EMPTY, Insets.EMPTY)));
         rightBorder.setBackground(new Background(new BackgroundFill(borderColor, CornerRadii.EMPTY, Insets.EMPTY)));
 
-        // Фон термінальної області з 50% прозорістю
-        Color terminalBgColor = Color.rgb(0, 43, 54, 0.5);
-        Background terminalBackground = new Background(new BackgroundFill(terminalBgColor, CornerRadii.EMPTY, Insets.EMPTY));
+        // Основное окно – фон с полным скруглением углов (все углы округлены)
+        Color terminalBgColor = Color.rgb(0, 43, 54); // фон без прозрачности
+        Background terminalBackground = new Background(new BackgroundFill(terminalBgColor, new CornerRadii(15), Insets.EMPTY));
 
-        // Налаштовуємо кореневий контейнер
         root = new BorderPane();
         root.setBackground(terminalBackground);
-        root.setTop(topBar);
+        root.setTop(topContainer);
         root.setBottom(bottomBar);
         root.setCenter(terminalCanvas);
         root.setLeft(leftBorder);
         root.setRight(rightBorder);
+        // Применяем CSS класс для основного окна (при необходимости можно задать здесь дополнительные стили)
+        root.getStyleClass().add("root");
 
-        // Розрахунок початкових розмірів сцени
-        double sceneWidth = initialCanvasWidth + SIDE_BORDER_WIDTH;
+        double sceneWidth = initialCanvasWidth + 6; // учет боковых рамок
         double sceneHeight = initialCanvasHeight + TOP_BAR_HEIGHT + BOTTOM_BAR_HEIGHT;
         scene = new Scene(root, sceneWidth, sceneHeight);
         scene.setFill(Color.TRANSPARENT);
 
-        // Підключення CSS (якщо необхідно)
+        // Подключаем CSS
         URL cssResource = getClass().getResource("/org/msv/vt100/ui/styles.css");
         if (cssResource != null) {
             scene.getStylesheets().add(cssResource.toExternalForm());
         } else {
-            System.err.println("styles.css not found at /org/msv/vt100/UI/styles.css");
+            System.err.println("styles.css not found at /org/msv/vt100/ui/styles.css");
         }
 
-        // Додаємо можливість переміщення вікна
+        // Глобальный слушатель фокуса для терминальной канвы
+        scene.focusOwnerProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal instanceof TerminalCanvas ||
+                    newVal instanceof TextInputControl ||
+                    newVal instanceof ComboBoxBase ||
+                    (newVal != null && newVal.getStyleClass().contains("combo-box-popup"))) {
+                return;
+            }
+            Platform.runLater(() -> terminalCanvas.requestFocus());
+        });
+
         enableWindowDragging();
-        // Додаємо можливість зміни розміру вікна
         enableWindowResizing();
 
-        terminalCanvas.setFocusTraversable(true);
-
-        // Слухачі для адаптації розмірів канви при зміні розміру сцени
+        // Адаптация размеров канвы при изменении размеров сцены
         scene.widthProperty().addListener((observable, oldValue, newValue) -> {
-            double newCanvasWidth = newValue.doubleValue() - SIDE_BORDER_WIDTH;
+            double newCanvasWidth = newValue.doubleValue() - 6;
             terminalCanvas.setWidth(newCanvasWidth);
             terminalCanvas.requestFocus();
         });
@@ -112,7 +125,7 @@ public class CustomTerminalWindow {
             terminalCanvas.requestFocus();
         });
 
-        // Слухач для відновлення фокусу при поверненні вікна
+        // Возврат фокуса терминальной канве при активации окна
         primaryStage.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
             if (isNowFocused) {
                 terminalCanvas.requestFocus();
@@ -125,27 +138,29 @@ public class CustomTerminalWindow {
         topBar.setPrefHeight(TOP_BAR_HEIGHT);
         topBar.setPadding(new Insets(5));
         topBar.setSpacing(5);
+        // Задаем фон верхней панели с закруглением только верхних углов
         Color topBarColor = Color.rgb(0, 0, 0, 0.5);
-        topBar.setBackground(new Background(new BackgroundFill(topBarColor, CornerRadii.EMPTY, Insets.EMPTY)));
+        topBar.setBackground(new Background(new BackgroundFill(topBarColor, new CornerRadii(15,15,0,0,false), Insets.EMPTY)));
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Кнопка для мінімізації
         Button minimizeButton = new Button("_");
+        minimizeButton.getStyleClass().add("top-bar-button");
         minimizeButton.setOnAction(event -> {
             Stage stage = (Stage) root.getScene().getWindow();
             stage.setIconified(true);
         });
-        // Кнопка для максимізації/відновлення
+
         Button maximizeButton = new Button("☐");
+        maximizeButton.getStyleClass().add("top-bar-button");
         maximizeButton.setOnAction(event -> {
             Stage stage = (Stage) root.getScene().getWindow();
             stage.setMaximized(!stage.isMaximized());
-            // Після максимізації чи відновлення повертаємо фокус канві
             terminalCanvas.requestFocus();
         });
-        // Кнопка для закриття
+
         Button closeButton = new Button("X");
+        closeButton.getStyleClass().addAll("top-bar-button", "close");
         closeButton.setOnAction(event -> {
             Stage stage = (Stage) root.getScene().getWindow();
             stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
@@ -159,16 +174,17 @@ public class CustomTerminalWindow {
         HBox bottomBar = new HBox();
         bottomBar.setPrefHeight(BOTTOM_BAR_HEIGHT);
         Color bottomBarColor = Color.rgb(0, 0, 0, 0.5);
-        bottomBar.setBackground(new Background(new BackgroundFill(bottomBarColor, CornerRadii.EMPTY, Insets.EMPTY)));
-        ContentPanel contentPanel = new ContentPanel(primaryStage, terminalApp);
+        // Задаем фон нижней панели с закруглением только нижних углов
+        bottomBar.setBackground(new Background(new BackgroundFill(bottomBarColor, new CornerRadii(0,0,15,15,false), Insets.EMPTY)));
+        this.contentPanel = new ContentPanel(primaryStage, terminalApp);
+        contentPanel.setPrefHeight(BOTTOM_BAR_HEIGHT);
         bottomBar.getChildren().add(contentPanel);
         return bottomBar;
     }
 
-    // Логіка переміщення вікна
+    // Логика перемещения окна
     private void enableWindowDragging() {
         root.setOnMousePressed(event -> {
-            // Якщо не змінюємо розмір, рухаємо вікно
             if (resizeDir == ResizeDirection.NONE) {
                 Stage stage = (Stage) root.getScene().getWindow();
                 xOffset = stage.getX() - event.getScreenX();
@@ -184,29 +200,29 @@ public class CustomTerminalWindow {
         });
     }
 
-    // Логіка зміни розміру вікна
+    // Логика изменения размера окна
     private void enableWindowResizing() {
         scene.setOnMouseMoved(event -> {
             ResizeDirection dir = getResizeDirection(event);
             switch (dir) {
                 case NORTH:
                 case SOUTH:
-                    scene.setCursor(Cursor.N_RESIZE);
+                    scene.setCursor(javafx.scene.Cursor.N_RESIZE);
                     break;
                 case EAST:
                 case WEST:
-                    scene.setCursor(Cursor.E_RESIZE);
+                    scene.setCursor(javafx.scene.Cursor.E_RESIZE);
                     break;
                 case NORTH_EAST:
                 case SOUTH_WEST:
-                    scene.setCursor(Cursor.NE_RESIZE);
+                    scene.setCursor(javafx.scene.Cursor.NE_RESIZE);
                     break;
                 case NORTH_WEST:
                 case SOUTH_EAST:
-                    scene.setCursor(Cursor.NW_RESIZE);
+                    scene.setCursor(javafx.scene.Cursor.NW_RESIZE);
                     break;
                 default:
-                    scene.setCursor(Cursor.DEFAULT);
+                    scene.setCursor(javafx.scene.Cursor.DEFAULT);
             }
         });
 
@@ -252,11 +268,10 @@ public class CustomTerminalWindow {
 
         scene.setOnMouseReleased(event -> {
             resizeDir = ResizeDirection.NONE;
-            scene.setCursor(Cursor.DEFAULT);
+            scene.setCursor(javafx.scene.Cursor.DEFAULT);
         });
     }
 
-    // Визначення напрямку зміни розміру за координатами миші
     private ResizeDirection getResizeDirection(MouseEvent event) {
         double mouseX = event.getSceneX();
         double mouseY = event.getSceneY();
@@ -279,15 +294,18 @@ public class CustomTerminalWindow {
         return ResizeDirection.NONE;
     }
 
-    public void configureStage(Stage stage) {
-        stage.initStyle(StageStyle.TRANSPARENT);
-        stage.setScene(scene);
-        stage.setResizable(true);
-        // Встановлюємо прозорість вікна на 50%
-        stage.setOpacity(0.95);
+    public ContentPanel getContentPanel() {
+        return contentPanel;
     }
 
     public TerminalCanvas getTerminalCanvas() {
         return terminalCanvas;
+    }
+
+    public void configureStage(Stage stage) {
+        stage.initStyle(StageStyle.TRANSPARENT);
+        stage.setScene(scene);
+        stage.setResizable(true);
+        stage.setOpacity(0.95);
     }
 }

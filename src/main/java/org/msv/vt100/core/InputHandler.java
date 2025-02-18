@@ -183,11 +183,18 @@ public class InputHandler {
     }
 
     private void sendToSSH(String data) {
-        try {
-            sshConnector.send(data);
-            logger.debug("Отправлено на SSH: {}", data);
-        } catch (IOException e) {
-            logger.error("Ошибка при отправке данных через SSH: {}", e.getMessage(), e);
+        SSHManager manager = terminalApp.getSSHManager();
+        if (manager != null) {
+            try {
+                manager.send(data);
+                logger.debug("Отправлено на SSH: {}", data);
+            } catch (IOException e) {
+                logger.error("Ошибка при отправке данных через SSH: {}", e.getMessage(), e);
+            }
+        } else {
+            logger.warn("SSHManager не установлен. Данные не отправлены: {}", data);
         }
     }
+
+
 }

@@ -139,5 +139,9 @@ public class SSHManager {
         executor.shutdownNow();
         scheduler.shutdownNow();
     }
+    public boolean isConnected() {
+        return isConnected.get();
+    }
+
 }
 

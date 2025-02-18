@@ -5,8 +5,8 @@ import javafx.application.Platform;
 import javafx.stage.Stage;
 import org.msv.vt100.ansiisequences.*;
 import org.msv.vt100.OrderAutomation.ScreenTextDetector;
-import org.msv.vt100.ui.UIController;
-import org.msv.vt100.ui.TerminalCanvas;
+import org.msv.vt100.ssh.SSHProfileManager;
+import org.msv.vt100.ui.*;
 import org.msv.vt100.core.*;
 import org.msv.vt100.ssh.SSHConfig;
 import org.msv.vt100.ssh.SSHManager;
@@ -19,19 +19,11 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * TerminalApp – главный класс приложения.
- * Здесь происходит:
- * <ul>
- *   <li>Инициализация логики терминала (курсора, буфера экрана, обработчиков escape‑последовательностей и т.д.)</li>
- *   <li>Инициализация пользовательского интерфейса через UIController</li>
- *   <li>Запуск SSH‑соединения через новый сервис SSHManager</li>
- *   <li>Обработка входящих данных (в том числе разбора escape‑последовательностей) и файловой логики через FileProcessingService</li>
- * </ul>
- */
 public class TerminalApp extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(TerminalApp.class);
@@ -46,6 +38,8 @@ public class TerminalApp extends Application {
     private ScreenTextDetector screenTextDetector;
     private InputProcessor inputProcessor;
     private UIController uiController;
+    private CustomTerminalWindow customTerminalWindow;
+    private SSHConfig currentProfile;
 
     // Новый SSH-сервис
     private SSHManager sshManager;
@@ -55,6 +49,9 @@ public class TerminalApp extends Application {
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
     private final ReentrantLock pauseLock = new ReentrantLock();
     private final Object pauseCondition = new Object();
+    private FileProcessingService fileProcessingService;
+    private Thread processingThread;
+
 
     // Логирование
     private boolean isLoggingEnabled = false;
@@ -80,22 +77,40 @@ public class TerminalApp extends Application {
      * Инициализирует SSHManager.
      */
     private void initializeSSHManager() {
-        try {
-            SSHConfig config = new SSHConfig("MMBFAEXT", "clustr.lutz.gmbh", 22, "D:\\XXXLutz\\Wichtiges\\Ukraine_PrivateKey_OPENSSH");
-            sshManager = new SSHManager(config);
-            sshManager.addDataListener(data -> Platform.runLater(() -> processInput(data.toCharArray())));
-            sshManager.connectAsync().exceptionally(ex -> {
-                logger.error("Ошибка подключения по SSH", ex);
-                return null;
-            });
-        } catch (Exception e) {
-            logger.error("Ошибка при инициализации SSHManager", e);
+        List<SSHConfig> profiles = SSHProfileManager.getProfiles();
+        SSHConfig autoProfile = SSHProfileManager.getAutoConnectProfile();
+        if (autoProfile != null) {
+            connectWithConfig(autoProfile);
+        } else {
+            // Показываем диалог профилей с основным окном как owner
+            Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
+            chosen.ifPresent(this::connectWithConfig);
         }
     }
 
-    /**
-     * Инициализирует основные компоненты терминальной логики.
-     */
+
+
+    private void connectWithConfig(SSHConfig config) {
+        if (sshManager != null && sshManager.isConnected()) {
+            sshManager.disconnect();
+        }
+        try {
+            currentProfile = config; // сохраняем профиль
+            sshManager = new SSHManager(config);
+            sshManager.addDataListener(data -> Platform.runLater(() -> processInput(data.toCharArray())));
+            sshManager.connectAsync().exceptionally(ex -> {
+                System.err.println("Ошибка подключения по SSH: " + ex.getMessage());
+                return null;
+            });
+        } catch (Exception e) {
+            System.err.println("Ошибка при инициализации SSHManager: " + e.getMessage());
+        }
+    }
+
+
+
+
+
     private void initializeComponents() {
         cursor = new Cursor(ROWS, COLUMNS);
         cursorVisibilityManager = new CursorVisibilityManager();
@@ -152,26 +167,33 @@ public class TerminalApp extends Application {
         );
     }
 
-    /**
-     * Инициализирует UIController и отображает окно.
-     */
+
     private void initializeUI(Stage primaryStage) {
         uiController = new UIController(primaryStage, this, screenBuffer, sshManager, cursor);
         uiController.show();
     }
-
-    /**
-     * Инициализирует FileProcessingService для обработки Excel-файлов.
-     */
-    private void initializeFileProcessingService() {
-        // Сервис обработки Excel файлов
-        FileProcessingService fileProcessingService = new FileProcessingService(sshManager, cursor, this, screenTextDetector, isPaused, isStopped);
+    public void openBearbeitungseinstellungenDialog() {
+        BearbeitungseinstellungenDialog dialog = new BearbeitungseinstellungenDialog(this);
+        dialog.show();
     }
 
-    /**
-     * Обновляет экран: устанавливает позицию курсора и перерисовывает TerminalCanvas.
-     */
-    public void updateScreen() {
+
+    private void initializeFileProcessingService() {
+        // Сервис обработки Excel файлов
+        this.fileProcessingService = new FileProcessingService(sshManager, cursor, this, screenTextDetector, isPaused, isStopped);
+    }
+    public void showProcessingButtons() {
+        uiController.getContentPanel().showProcessingButtons();
+        System.out.println("The button in the donwbar on");
+    }
+
+    public void hideProcessingButtons() {
+        uiController.getContentPanel().hideProcessingButtons();
+        System.out.println("The button in the donwbar off");
+    }
+
+
+    void updateScreen() {
         TerminalCanvas canvas = uiController.getTerminalCanvas();
         canvas.setCursorPosition(cursor.getRow(), cursor.getColumn());
         canvas.cursorVisible = cursorVisibilityManager.isCursorVisible();
@@ -187,9 +209,6 @@ public class TerminalApp extends Application {
         screenUpdateTimeline.play();
     }
 
-    /**
-     * Делегирует обработку входящего массива символов InputProcessor.
-     */
     public void processInput(char[] inputChars) {
         inputProcessor.processInput(inputChars);
     }
@@ -266,6 +285,50 @@ public class TerminalApp extends Application {
             throw new InterruptedException("Обработка остановлена");
         }
     }
+    public SSHManager getSSHManager() {
+        return sshManager;
+    }
+    public FileProcessingService getFileProcessingService() {
+        return fileProcessingService;
+    }
+    public void openProfileDialog() {
+        Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
+        chosen.ifPresent(config -> {
+            if (sshManager != null && sshManager.isConnected()) {
+                sshManager.disconnect();
+            }
+            connectWithConfig(config);
+        });
+    }
+
+    /**
+     * Перезапускает текущее соединение, используя сохранённый профиль.
+     * Если профиль не найден, открывает диалог выбора.
+     */
+    public void restartConnection() {
+        if (sshManager != null && sshManager.isConnected()) {
+            sshManager.disconnect();
+            if (currentProfile != null) {
+                connectWithConfig(currentProfile);
+            } else {
+                openProfileDialog();
+            }
+        } else {
+            openProfileDialog();
+        }
+    }
+
+    public void disconnectConnection() {
+        if (sshManager != null && sshManager.isConnected()) {
+            sshManager.disconnect();
+            processInput("Подключение было отключено\r".toCharArray());
+        }
+    }
+
+    public Thread getProcessingThread() {
+        return processingThread;
+    }
+
 
     public static void main(String[] args) {
         launch(args);
