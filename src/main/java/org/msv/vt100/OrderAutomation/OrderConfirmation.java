@@ -230,6 +230,8 @@ public class OrderConfirmation {
         return cursorPosition[0];
     }
 
+
+
     /**
      * Helper method to send data with a delay.
      *

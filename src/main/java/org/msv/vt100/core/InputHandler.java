@@ -229,6 +229,8 @@ public class InputHandler {
         highlightCursorPosition();
     }
 
+
+
     /**
      * Sends the specified data to the SSH server.
      *

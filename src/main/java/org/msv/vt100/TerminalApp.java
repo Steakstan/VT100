@@ -1,5 +1,9 @@
 package org.msv.vt100;
 
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
+import ch.qos.logback.core.FileAppender;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
@@ -19,6 +23,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
 
+import java.io.File;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -383,8 +388,9 @@ public class TerminalApp extends Application {
      */
     public void enableLogging() {
         isLoggingEnabled = true;
-        logger.info("Logging aktiviert.");
+        addFileAppender();
         setLoggingLevel(Level.DEBUG);
+        logger.info("Logging aktiviert.");
     }
 
     /**
@@ -392,9 +398,66 @@ public class TerminalApp extends Application {
      */
     public void disableLogging() {
         isLoggingEnabled = false;
-        logger.info("Logging deaktiviert.");
+        removeFileAppender();
         setLoggingLevel(Level.OFF);
+        logger.info("Logging deaktiviert.");
     }
+
+    private void addFileAppender() {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+
+        if (rootLogger.getAppender("FILE") != null) {
+            return;
+        }
+
+        FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
+        fileAppender.setName("FILE");
+        fileAppender.setContext(loggerContext);
+
+        String logPath = System.getProperty("LOG_PATH", "logs/app.log");
+
+        // Если logPath указывает на директорию, добавляем имя файла по умолчанию
+        File logFile = new File(logPath);
+        if (logFile.isDirectory()) {
+            logPath = new File(logFile, "app.log").getAbsolutePath();
+        }
+
+        // Создаем родительский каталог, если он не существует
+        File finalLogFile = new File(logPath);
+        File parentDir = finalLogFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
+        fileAppender.setFile(logPath);
+        fileAppender.setAppend(true);
+
+        PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+        encoder.setContext(loggerContext);
+        encoder.setPattern("%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n");
+        encoder.start();
+
+        fileAppender.setEncoder(encoder);
+        fileAppender.start();
+
+        rootLogger.addAppender(fileAppender);
+    }
+
+
+
+    private void removeFileAppender() {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+
+        Appender<ILoggingEvent> fileAppender = rootLogger.getAppender("FILE");
+        if (fileAppender != null) {
+            rootLogger.detachAppender(fileAppender);
+            fileAppender.stop();
+        }
+    }
+
+
 
     /**
      * Sets the logging level for the root logger.
@@ -403,7 +466,7 @@ public class TerminalApp extends Application {
      */
     private void setLoggingLevel(Level level) {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
         rootLogger.setLevel(level);
     }
 
