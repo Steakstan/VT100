@@ -38,9 +38,11 @@ Installation
 
 
 git clone https://github.com/yourusername/vt100-ssh-terminal.git
+
 cd vt100-ssh-terminal
 
 2. Build the Project:
+
 Use your preferred Java build tool. For example, with Maven:
 
 mvn clean package
@@ -54,6 +56,7 @@ gradle build
 After building, run the generated JAR file. For example:
 
 java -jar target/vt100-ssh-terminal.jar
+
 Usage
 SSH Connection:
 Upon startup, the application checks for an auto-connect SSH profile. If none is available, it will prompt you to select a profile for connection.
