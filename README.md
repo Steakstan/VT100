@@ -37,7 +37,7 @@ Installation
 1. Clone the Repository:
 
 
-git clone https://github.com/yourusername/vt100-ssh-terminal.git
+git clone https://github.com/Steakstan/VT100.git
 
 cd vt100-ssh-terminal
 
