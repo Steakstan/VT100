@@ -10,13 +10,25 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 
+/**
+ * DeliveryDateProcessor handles the processing of delivery dates for orders.
+ * It reads order and delivery data from an Excel sheet, sends commands via SSH,
+ * and interacts with the terminal based on the current screen content.
+ */
 public class DeliveryDateProcessor {
     private final SSHManager sshConnector;
     private final Cursor cursor;
     private final TerminalApp terminalApp;
     private final ScreenTextDetector screenTextDetector;
 
-
+    /**
+     * Constructs a DeliveryDateProcessor.
+     *
+     * @param sshConnector       the SSHManager for sending commands.
+     * @param cursor             the terminal cursor.
+     * @param terminalApp        the main TerminalApp.
+     * @param screenTextDetector the detector for screen content.
+     */
     public DeliveryDateProcessor(SSHManager sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
         this.sshConnector = sshConnector;
         this.cursor = cursor;
@@ -24,53 +36,60 @@ public class DeliveryDateProcessor {
         this.screenTextDetector = screenTextDetector;
     }
 
+    /**
+     * Processes the delivery date for a single order.
+     *
+     * @param row the Excel row containing order and delivery data.
+     * @throws InterruptedException if processing is interrupted.
+     * @throws IOException          if an I/O error occurs.
+     */
     public void processDeliveryDate(Row row) throws InterruptedException, IOException {
         String orderNumber = FileExtractor.extractCellValueAsString(row.getCell(0));
         String positionNumber = FileExtractor.extractCellValueAsString(row.getCell(1));
         String deliveryDate = FileExtractor.extractCellValueAsString(row.getCell(2));
         if (screenTextDetector.isAufNrDisplayed()) {
             if (orderNumber.length() == 5) {
-                System.out.println("На экране 'Auf-Nr.:' и номер заказа состоит из 5 цифр. Отправляем 'L' на сервер.");
+                System.out.println("Auf dem Bildschirm 'Auf-Nr.:' und die Bestellnummer besteht aus 5 Ziffern. Sende 'L' an den Server.");
                 terminalApp.checkForStop();
                 sendDataWithDelay("L");
                 sendDataWithDelay("\r");
             } else if (orderNumber.length() != 6) {
-                System.out.println("Ошибка: Номер заказа должен содержать 5 или 6 символов. Остановлена обработка.");
+                System.out.println("Fehler: Die Bestellnummer muss 5 oder 6 Zeichen enthalten. Verarbeitung gestoppt.");
                 return;
             }
         } else if (screenTextDetector.isLbNrDisplayed()) {
             if (orderNumber.length() == 6) {
-                System.out.println("На экране 'LB-Nr.:' и номер заказа состоит из 6 цифр. Отправляем 'K' на сервер.");
+                System.out.println("Auf dem Bildschirm 'LB-Nr.:' und die Bestellnummer besteht aus 6 Ziffern. Sende 'K' an den Server.");
                 terminalApp.checkForStop();
                 sendDataWithDelay("K");
                 sendDataWithDelay("\r");
             } else if (orderNumber.length() != 5) {
-                System.out.println("Ошибка: Номер заказа должен содержать 5 или 6 символов. Остановлена обработка.");
+                System.out.println("Fehler: Die Bestellnummer muss 5 oder 6 Zeichen enthalten. Verarbeitung gestoppt.");
                 return;
             }
         } else {
-            System.out.println("Не удалось определить, что отображается на экране. Обработка остановлена.");
+            System.out.println("Es konnte nicht festgestellt werden, was auf dem Bildschirm angezeigt wird. Verarbeitung gestoppt.");
             return;
         }
 
-        // Метка для возврата к началу обработки заказа
+        // Label for returning to the start of order processing
         startProcessing:
 
         while (true) {
-            System.out.println("Обработка даты поставки для заказа: " + orderNumber);
+            System.out.println("Verarbeitung des Lieferdatums für Bestellung: " + orderNumber);
 
             String cursorPosition = getCursorPosition();
 
             while (!cursorPosition.equals("311")) {
-                System.out.println("Значение позиции курсора не равно '311'. Перемещение курсора влево и повторная проверка.");
+                System.out.println("Die Cursorposition ist nicht '311'. Bewege den Cursor nach links und überprüfe erneut.");
                 terminalApp.checkForStop();
                 sendDataWithDelay("\u001BOQ");
 
-                // Повторная проверка позиции курсора
+                // Recheck cursor position
                 cursorPosition = getCursorPosition();
 
                 if (cursorPosition.equals("2362")) {
-                    System.out.println("Курсор в положении '2362'. Ввод буквы 'L' и значений '5.0321'.");
+                    System.out.println("Der Cursor befindet sich in Position '2362'. Eingabe des Buchstabens 'L' und des Wertes '5.0321'.");
                     terminalApp.checkForStop();
                     sendDataWithDelay("L");
                     sendDataWithDelay("\r");
@@ -78,138 +97,138 @@ public class DeliveryDateProcessor {
                     sendDataWithDelay("5.0321");
                     sendDataWithDelay("\r");
 
-                    System.out.println("Повторная обработка текущего заказа: " + orderNumber);
-                    processDeliveryDate(row); // Повторный вызов метода для обработки текущего заказа
-                    return; // Завершение текущей обработки
+                    System.out.println("Erneute Verarbeitung der aktuellen Bestellung: " + orderNumber);
+                    processDeliveryDate(row); // Recursively process the current order again
+                    return; // End current processing
                 }
 
-                // Перемещаем курсор влево до позиции 311
+                // Move the cursor left until it is at position 311
                 while (!cursorPosition.equals("311")) {
                     terminalApp.checkForStop();
                     sendDataWithDelay("\u001BOQ");
                     cursorPosition = getCursorPosition();
                 }
 
-                System.out.println("Курсор установлен на позицию 311. Повторная попытка обработки заказа.");
+                System.out.println("Der Cursor wurde auf Position 311 gesetzt. Erneuter Versuch der Auftragsverarbeitung.");
 
-                // Повторяем ввод заказа
+                // Repeat order input
                 processDeliveryDate(row);
                 return;
             }
 
-            System.out.println("Курсор установлен на позицию 311.");
+            System.out.println("Der Cursor wurde auf Position 311 gesetzt.");
 
-            // Ввод номера заказа и позиции
-            System.out.println("Ввод номера заказа: " + orderNumber);
+            // Input order number and position
+            System.out.println("Bestellnummer eingeben: " + orderNumber);
             terminalApp.checkForStop();
             sendDataWithDelay(orderNumber);
             sendDataWithDelay("\r");
 
-            System.out.println("Ввод номера позиции: " + positionNumber);
+            System.out.println("Positionsnummer eingeben: " + positionNumber);
             terminalApp.checkForStop();
             sendDataWithDelay(positionNumber);
             sendDataWithDelay("\r");
 
-            System.out.println("Проверка, не доставлен ли заказ.");
+            System.out.println("Überprüfung, ob die Bestellung bereits geliefert wurde.");
             if (screenTextDetector.isWareneingangDisplayed()) {
                 return;
             }
 
             cursorPosition = getCursorPosition();
             if (!cursorPosition.equals("1374")) {
-                System.out.println("Курсор не на позиции 1374. Переход к следующему заказу. Текущая позиция " + cursorPosition);
-                return; // Прерываем обработку текущего заказа
+                System.out.println("Der Cursor ist nicht auf Position 1374. Wechsle zur nächsten Bestellung. Aktuelle Position: " + cursorPosition);
+                return; // Abort processing of the current order
             }
 
-            // Если курсор на позиции 1374
-            System.out.println("Курсор установлен на позицию 1374. Ввод буквы 'N' и нажатие Enter.");
+            // If the cursor is at position 1374
+            System.out.println("Der Cursor wurde auf Position 1374 gesetzt. Eingabe des Buchstabens 'N' und Drücken von Enter.");
             terminalApp.checkForStop();
             sendDataWithDelay("N");
             sendDataWithDelay("\r");
             cursorPosition = getCursorPosition();
 
-            // Продолжаем нажатие Enter до позиции 936
-            System.out.println("Продолжаем нажатие Enter до достижения позиции 936.");
-            // Для хранения предыдущей позиции курсора
-            int consecutive411Count = 0; // Счетчик для отслеживания повторных появлений позиции 411
+            // Continue pressing Enter until position 936 is reached
+            System.out.println("Drücke Enter weiter, bis Position 936 erreicht ist.");
+            // For storing the previous cursor position
+            int consecutive411Count = 0; // Counter for repeated appearance of position 411
 
             while (!cursorPosition.equals("936")) {
                 terminalApp.checkForStop();
                 sendDataWithDelay("\r");
                 cursorPosition = getCursorPosition();
-                System.out.println("Нажимаем энтер. Номер позиции " + cursorPosition);
+                System.out.println("Drücke Enter. Cursorposition: " + cursorPosition);
 
-                // Проверка на повторную позицию 411
+                // Check for repeated position 411
                 if (cursorPosition.equals("411")) {
                     terminalApp.checkForStop();
                     consecutive411Count++;
-                    System.out.println("Курсор на позиции 411. Счетчик повторных появлений: " + consecutive411Count);
+                    System.out.println("Der Cursor ist auf Position 411. Wiederholungscount: " + consecutive411Count);
                     if (consecutive411Count == 2) {
-                        System.out.println("Курсор дважды подряд на позиции 411. Сброс обработки заказа.");
-                        return; // Возвращаемся к началу обработки того же заказа
+                        System.out.println("Der Cursor war zweimal hintereinander auf Position 411. Auftragsverarbeitung zurückgesetzt.");
+                        return; // Return to the beginning of the processing for the same order
                     }
                 } else {
-                    consecutive411Count = 0; // Сбрасываем счетчик если позиция отличается от 411
+                    consecutive411Count = 0; // Reset the counter if the position is different from 411
                 }
             }
-            System.out.println("Курсор установлен на позицию 936.");
+            System.out.println("Der Cursor wurde auf Position 936 gesetzt.");
 
-            // Ввод даты поставки
-            System.out.println("Ввод даты поставки: " + deliveryDate);
+            // Input delivery date
+            System.out.println("Lieferdatum eingeben: " + deliveryDate);
             terminalApp.checkForStop();
             sendDataWithDelay(deliveryDate);
             sendDataWithDelay("\r");
 
-            // Нажимаем "T" и Enter до позиции 2375
-            System.out.println("Ввод буквы 'T' и нажатие Enter до достижения позиции 2375.");
+            // Input letter "T" and press Enter until position 2375 is reached
+            System.out.println("Eingabe des Buchstabens 'T' und Drücken von Enter, bis Position 2375 erreicht ist.");
             terminalApp.checkForStop();
             sendDataWithDelay("T");
             sendDataWithDelay("\r");
-            Thread.sleep(2500);
+            Thread.sleep(1500);
             label:
             while (true) {
                 terminalApp.checkForStop();
                 sendDataWithDelay("\r");
                 cursorPosition = getCursorPosition();
-                System.out.println("нажатие Enter " + cursorPosition);
+                System.out.println("Drücke Enter: " + cursorPosition);
 
                 switch (cursorPosition) {
                     case "2375":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор установлен на позицию 2375.");
+                        System.out.println("Der Cursor wurde auf Position 2375 gesetzt.");
                         break label;
                     case "2376":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор установлен на позицию 2376.");
+                        System.out.println("Der Cursor wurde auf Position 2376 gesetzt.");
                         break label;
                     case "2377":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор установлен на позицию 2377.");
+                        System.out.println("Der Cursor wurde auf Position 2377 gesetzt.");
                         break label;
                     case "2378":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор установлен на позицию 2378.");
+                        System.out.println("Der Cursor wurde auf Position 2378 gesetzt.");
                         break label;
                     case "2362":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор в положении '2362'. Ввод буквы 'L' и значений '5.0321'.");
+                        System.out.println("Der Cursor befindet sich in Position '2362'. Eingabe des Buchstabens 'L' und des Wertes '5.0321'.");
                         sendDataWithDelay("L");
                         sendDataWithDelay("\r");
                         sendDataWithDelay("5.0321");
                         sendDataWithDelay("\r");
 
-                        System.out.println("Повторная обработка текущего заказа: " + orderNumber);
-                        processDeliveryDate(row); // Повторный вызов метода для обработки текущего заказа
+                        System.out.println("Erneute Verarbeitung der aktuellen Bestellung: " + orderNumber);
+                        processDeliveryDate(row); // Recursive call for reprocessing the current order
                         return;
                     case "411":
                         terminalApp.checkForStop();
-                        System.out.println("Курсор установлен на позицию 411. Прерывание цикла и повторная обработка заказа.");
+                        System.out.println("Der Cursor wurde auf Position 411 gesetzt. Schleife wird abgebrochen und der Auftrag erneut verarbeitet.");
                         continue startProcessing;
                 }
             }
 
-            // Вводим "Z" и нажимаем Enter до позиции 2212
-            System.out.println("Ввод буквы 'Z' и нажатие Enter до достижения позиции 2212.");
+            // Input "Z" and press Enter until position 2212 is reached
+            System.out.println("Eingabe des Buchstabens 'Z' und Drücken von Enter, bis Position 2212 erreicht ist.");
             terminalApp.checkForStop();
             sendDataWithDelay("Z");
             sendDataWithDelay("\r");
@@ -219,34 +238,34 @@ public class DeliveryDateProcessor {
                 sendDataWithDelay("\r");
                 cursorPosition = getCursorPosition();
             }
-            System.out.println("Курсор установлен на позицию " + cursorPosition + ".");
+            System.out.println("Der Cursor wurde auf Position " + cursorPosition + " gesetzt.");
 
-            // Извлекаем первые два числа из даты поставки для комментария
+            // Extract the first two characters from the delivery date for the comment
             String kwWeek = extractWeekFromDeliveryDate(deliveryDate);
 
-            // Вставляем комментарий с использованием даты поставки
+            // Insert a comment using the delivery date
             String comment = "DEM HST NACH WIRD DIE WARE IN KW " + kwWeek + " ZUGESTELLT";
-            System.out.println("Ввод комментария: " + comment);
+            System.out.println("Kommentar eingeben: " + comment);
             terminalApp.checkForStop();
             sendDataWithDelay(comment);
             sendDataWithDelay("\r");
 
-            // Проверка позиции 2274
-            System.out.println("Проверка позиции курсора через F1.");
+            // Check cursor position via F1
+            System.out.println("Überprüfung der Cursorposition über F1.");
             cursorPosition = getCursorPosition();
             if (cursorPosition.equals("2274") || cursorPosition.equals("2273") || cursorPosition.equals("2278")) {
                 terminalApp.checkForStop();
-                System.out.println("Курсор установлен на позицию " + cursorPosition + ". Нажатие Enter.");
+                System.out.println("Der Cursor wurde auf Position " + cursorPosition + " gesetzt. Drücke Enter.");
                 sendDataWithDelay("\r");
             }
 
-            // Проверка позиции 222
-            System.out.println("Проверка позиции 222.");
+            // Check position 222
+            System.out.println("Überprüfung der Position 222.");
             cursorPosition = getCursorPosition();
             if (cursorPosition.equals("222")) {
-                System.out.println("Курсор установлен на позицию 222.");
-                // Возвращаемся к позиции 2375
-                System.out.println("Возвращение к позиции 2375 путем нажатия стрелки влево.");
+                System.out.println("Der Cursor wurde auf Position 222 gesetzt.");
+                // Return to position 2375
+                System.out.println("Rückkehr zur Position 2375 durch Drücken der linken Pfeiltaste.");
                 while (!cursorPosition.equals("2375") && !cursorPosition.equals("2376") && !cursorPosition.equals("2377") && !cursorPosition.equals("2378")) {
                     terminalApp.checkForStop();
                     sendDataWithDelay("\u001BOQ");
@@ -257,38 +276,51 @@ public class DeliveryDateProcessor {
 
             cursorPosition = getCursorPosition();
 
-            if(screenTextDetector.isPosNrDisplayed()&&cursorPosition.equals("2362")){
+            if (screenTextDetector.isPosNrDisplayed() && cursorPosition.equals("2362")) {
                 terminalApp.checkForStop();
                 sendDataWithDelay("\r");
             }
 
-            // Проверка на позицию 2362 для завершения
-            System.out.println("Проверка позиции 2362.");
+            // Check for position 2362 for finishing up
+            System.out.println("Überprüfung der Position 2362.");
             cursorPosition = getCursorPosition();
             if (cursorPosition.equals("2362")) {
                 terminalApp.checkForStop();
-                System.out.println("Курсор установлен на позицию 2362. Нажатие стрелки влево.");
+                System.out.println("Der Cursor wurde auf Position 2362 gesetzt. Drücke die linke Pfeiltaste.");
                 sendDataWithDelay("\u001BOQ");
             }
 
-            System.out.println("Задержка перед обработкой следующего заказа.");
+            System.out.println("Verzögerung vor der Verarbeitung der nächsten Bestellung.");
 
-            break; // Выходим из цикла после успешной обработки заказа
+            break; // Exit the loop after successfully processing the order
         }
     }
 
+    /**
+     * Extracts the first two characters from the delivery date for use in a comment.
+     *
+     * @param deliveryDate the delivery date string.
+     * @return the extracted week value or "??" if the date is invalid.
+     */
     private String extractWeekFromDeliveryDate(String deliveryDate) {
-        // Предполагается, что deliveryDate имеет формат "dd.MM.yyyy" или подобный
+        // It is assumed that deliveryDate is in the format "dd.MM.yyyy" or similar.
         if (deliveryDate != null && deliveryDate.length() >= 2) {
-            return deliveryDate.substring(0, 2);  // Извлекаем первые два символа
+            return deliveryDate.substring(0, 2);  // Extract the first two characters
         }
-        return "??";  // Возвращаем значение по умолчанию, если дата некорректна
+        return "??";  // Return default value if date is invalid
     }
 
+    /**
+     * Processes delivery dates for multiple orders from the given row iterator.
+     *
+     * @param rows an Iterator of Excel rows.
+     * @throws IOException          if an I/O error occurs.
+     * @throws InterruptedException if processing is interrupted.
+     */
     public void processDeliveryDates(Iterator<Row> rows) throws IOException, InterruptedException {
         while (rows.hasNext()) {
             if (terminalApp.isStopped()) {
-                System.out.println("Processing stopped.");
+                System.out.println("Verarbeitung gestoppt.");
                 break;
             }
 
@@ -299,6 +331,12 @@ public class DeliveryDateProcessor {
         }
     }
 
+    /**
+     * Retrieves the current cursor position as a concatenated string of row and column.
+     *
+     * @return the cursor position string.
+     * @throws InterruptedException if interrupted while waiting.
+     */
     private String getCursorPosition() throws InterruptedException {
         final String[] cursorPosition = new String[1];
         CountDownLatch latch = new CountDownLatch(1);
@@ -312,20 +350,24 @@ public class DeliveryDateProcessor {
         return cursorPosition[0];
     }
 
-    // Вспомогательный метод для отправки данных с задержкой
+    /**
+     * Helper method for sending data with a delay.
+     *
+     * @param data the data string to send.
+     * @throws IOException          if an I/O error occurs.
+     * @throws InterruptedException if interrupted during the delay.
+     */
     private void sendDataWithDelay(String data) throws IOException, InterruptedException {
         sshConnector.send(data);
-        int sleepTime = 500; // Задержка в 500 мс
-        int interval = 50; // Проверяем каждые 50 мс
+        int sleepTime = 500; // Delay in 500 ms
+        int interval = 50;   // Check every 50 ms
         int elapsed = 0;
         while (elapsed < sleepTime) {
             if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("Processing stopped");
+                throw new InterruptedException("Verarbeitung gestoppt");
             }
             Thread.sleep(interval);
             elapsed += interval;
         }
     }
-
-
 }

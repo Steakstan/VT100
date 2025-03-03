@@ -15,6 +15,13 @@ import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
 
 import java.io.File;
+import java.util.Objects;
+
+/**
+ * BearbeitungseinstellungenDialog is a dialog for configuring processing settings.
+ * It allows the user to select an operation and a file to process.
+ * User-visible texts (labels, button captions, etc.) remain in German.
+ */
 
 public class BearbeitungseinstellungenDialog {
 
@@ -22,22 +29,21 @@ public class BearbeitungseinstellungenDialog {
     private final TerminalApp terminalApp;
     private ComboBox<String> operationComboBox;
     private TextField filePathField;
-    private Button browseButton;
-    private Button startProcessingButton;
-    private Button cancelButton;
 
     public BearbeitungseinstellungenDialog(TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
         dialog = new Stage();
-        // Используем прозрачный стиль, как в LogSettingsDialog
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("Bearbeitungseinstellungen");
         initUI();
     }
 
+    /**
+     * Initializes the user interface for the dialog.
+     */
     private void initUI() {
-        // Создание заголовка (header) с названием и кнопкой закрытия
+        // Create header with title and close button
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -53,13 +59,14 @@ public class BearbeitungseinstellungenDialog {
 
         header.getChildren().addAll(titleLabel, spacer, headerCloseButton);
 
-        // Основное содержимое – сетка с полями и кнопками
+        // Create main content using a GridPane
         GridPane grid = new GridPane();
         grid.setPadding(new Insets(10));
         grid.setHgap(10);
         grid.setVgap(10);
         grid.getStyleClass().add("dialog-grid");
 
+        // Operation label and ComboBox
         Label operationLabel = new Label("Operation:");
         operationLabel.getStyleClass().add("dialog-label-turquoise");
 
@@ -72,6 +79,7 @@ public class BearbeitungseinstellungenDialog {
         );
         operationComboBox.getSelectionModel().selectFirst();
 
+        // File selection label and field
         Label fileLabel = new Label("Datei auswählen:");
         fileLabel.getStyleClass().add("dialog-label-turquoise");
 
@@ -79,7 +87,8 @@ public class BearbeitungseinstellungenDialog {
         filePathField.setPrefWidth(300);
         filePathField.getStyleClass().add("dialog-text-field");
 
-        browseButton = new Button("Durchsuchen");
+        // Browse button for file selection
+        Button browseButton = new Button("Durchsuchen");
         browseButton.getStyleClass().add("dialog-button");
         browseButton.setOnAction(e -> {
             FileChooser fileChooser = new FileChooser();
@@ -91,33 +100,36 @@ public class BearbeitungseinstellungenDialog {
             }
         });
 
-        startProcessingButton = new Button("Verarbeitung starten");
+        HBox fileBox = new HBox(5, filePathField, browseButton);
+        fileBox.setAlignment(Pos.CENTER_LEFT);
+
+        // Create Start Processing and Cancel buttons
+        Button startProcessingButton = new Button("Verarbeitung starten");
         startProcessingButton.getStyleClass().add("dialog-button");
         startProcessingButton.setOnAction(e -> startProcessing());
 
-        cancelButton = new Button("Abbrechen");
+        Button cancelButton = new Button("Abbrechen");
         cancelButton.getStyleClass().add("dialog-button");
         cancelButton.setOnAction(e -> dialog.close());
 
+        HBox buttonBox = new HBox(10, startProcessingButton, cancelButton);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+
+        // Add elements to the grid
         grid.add(operationLabel, 0, 0);
         grid.add(operationComboBox, 1, 0);
         grid.add(fileLabel, 0, 1);
-        HBox fileBox = new HBox(5, filePathField, browseButton);
-        fileBox.setAlignment(Pos.CENTER_LEFT);
         grid.add(fileBox, 1, 1);
-        HBox buttonBox = new HBox(10, startProcessingButton, cancelButton);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
         grid.add(buttonBox, 1, 2);
 
-        // Объединяем header и основное содержимое в корневой контейнер
+        // Assemble the dialog's root container
         BorderPane root = new BorderPane();
         root.setTop(header);
         root.setCenter(grid);
         root.getStyleClass().add("root-dialog");
-        // Задаём прозрачный фон
         root.setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, null, null)));
 
-        // Применяем клип с закруглёнными углами
+        // Apply a clip with rounded corners for effect
         Rectangle clip = new Rectangle(500, 200);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
@@ -125,11 +137,15 @@ public class BearbeitungseinstellungenDialog {
 
         Scene scene = new Scene(root, 500, 200);
         scene.setFill(Color.TRANSPARENT);
-        // Подключаем CSS-стили (убедитесь, что путь корректный)
-        scene.getStylesheets().add(getClass().getResource("/org/msv/vt100/ui/styles.css").toExternalForm());
+        // Connect the CSS stylesheet (ensure the path is correct)
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles.css")).toExternalForm());
+
         dialog.setScene(scene);
     }
 
+    /**
+     * Starts the file processing operation.
+     */
     private void startProcessing() {
         String filePath = filePathField.getText();
         if (filePath == null || filePath.isEmpty()) {
@@ -139,10 +155,10 @@ public class BearbeitungseinstellungenDialog {
         }
         int choice = operationComboBox.getSelectionModel().getSelectedIndex() + 1;
 
-        // Закрываем диалог перед запуском обработки
+        // Close the dialog before starting processing
         dialog.close();
 
-        // Запускаем обработку в отдельном потоке
+        // Run processing in a separate thread
         new Thread(() -> {
             try {
                 terminalApp.getFileProcessingService().processFile(choice, filePath);
@@ -169,6 +185,9 @@ public class BearbeitungseinstellungenDialog {
         terminalApp.showProcessingButtons();
     }
 
+    /**
+     * Displays the dialog and waits for user input.
+     */
     public void show() {
         dialog.showAndWait();
     }

@@ -7,11 +7,11 @@ import org.msv.vt100.ansiisequences.EscapeSequenceHandler;
 import org.msv.vt100.ansiisequences.CharsetSwitchHandler;
 
 /**
- * InputProcessor – класс для обработки входящего потока символов.
- * Он отвечает за разбиение потока на escape-последовательности, специальные управляющие символы (CR, LF, Backspace)
- * и передачу обычного текста для вывода через CursorController.
- * Все необходимые зависимости (обработчики escape-последовательностей, курсор, обработчики символов, форматирование)
- * передаются через конструктор.
+ * InputProcessor is a class for processing the incoming stream of characters.
+ * It is responsible for splitting the stream into escape sequences, special control characters (CR, LF, Backspace),
+ * and passing regular text to the screen via the CursorController.
+ * All required dependencies (escape sequence handler, cursor controller, character handlers, text formatter)
+ * are provided through the constructor.
  */
 public class InputProcessor {
 
@@ -20,22 +20,22 @@ public class InputProcessor {
     private final NrcsHandler nrcsHandler;
     private final CharsetSwitchHandler charsetSwitchHandler;
     private final TextFormater textFormater;
-    private final Runnable backspaceHandler;       // обратный вызов для обработки Backspace
+    private final Runnable backspaceHandler;       // Callback for handling Backspace
 
-    // Внутреннее состояние для разбора escape-последовательностей
+    // Internal state for parsing escape sequences
     private boolean inEscapeSequence = false;
     private boolean inDCSSequence = false;
     private final StringBuilder escapeSequence = new StringBuilder();
 
     /**
-     * Конструктор InputProcessor.
+     * Constructs an InputProcessor.
      *
-     * @param escapeSequenceHandler обработчик escape-последовательностей
-     * @param cursorController      контроллер курсора (для перемещения и вывода символов)
-     * @param nrcsHandler           обработчик национальных наборов символов
-     * @param charsetSwitchHandler  обработчик переключения набора символов
-     * @param textFormater          объект для форматирования текста (определяет текущий стиль)
-     * @param backspaceHandler      обратный вызов для обработки нажатия Backspace (например, метод, реализующий логику удаления символа)
+     * @param escapeSequenceHandler the handler for escape sequences.
+     * @param cursorController      the controller for cursor movement and character output.
+     * @param nrcsHandler           the handler for national character sets.
+     * @param charsetSwitchHandler  the handler for switching character sets.
+     * @param textFormater          the text formatter that defines the current style.
+     * @param backspaceHandler      a callback for handling Backspace (e.g., a method implementing the delete logic).
      */
     public InputProcessor(EscapeSequenceHandler escapeSequenceHandler,
                           CursorController cursorController,
@@ -52,9 +52,9 @@ public class InputProcessor {
     }
 
     /**
-     * Обрабатывает входящий массив символов.
+     * Processes an incoming array of characters (e.g., received via SSH).
      *
-     * @param inputChars массив входящих символов (например, полученных из SSH)
+     * @param inputChars the array of input characters.
      */
     public void processInput(char[] inputChars) {
         for (int i = 0; i < inputChars.length; i++) {
@@ -101,8 +101,8 @@ public class InputProcessor {
             } else if (currentChar == '\b') {
                 backspaceHandler.run();
             } else {
-                // Обработка обычного символа: сначала через CharsetSwitch и NRCS,
-                // затем вывод на экран с использованием текущего стиля из TextFormater.
+                // Process a regular character: first via CharsetSwitch and NRCS,
+                // then output it to the screen using the current style from TextFormater.
                 String processedChar = nrcsHandler.processText(
                         charsetSwitchHandler.processText(String.valueOf(currentChar))
                 );
@@ -112,12 +112,12 @@ public class InputProcessor {
     }
 
     /**
-     * Добавляет текст в буфер экрана, вызывая метод handleCharacter у CursorController для каждого символа.
+     * Adds the given text to the screen buffer by calling the handleCharacter method of the CursorController for each character.
      *
-     * @param input текст для добавления
+     * @param input the text to add.
      */
     private void addTextToBuffer(String input) {
-        // Если нужна дополнительная обработка, можно добавить вызов методов
+        // If additional processing is needed, additional method calls can be added here.
         for (int offset = 0; offset < input.length(); ) {
             int codePoint = input.codePointAt(offset);
             String currentChar = new String(Character.toChars(codePoint));

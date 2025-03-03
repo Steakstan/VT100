@@ -9,9 +9,9 @@ import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.ScreenBuffer;
 
 /**
- * UIController отвечает за инициализацию и обновление всех элементов JavaFX‑интерфейса.
- * Он создаёт главное окно терминала (CustomTerminalWindow), прикрепляет обработчики ввода
- * и предоставляет методы для обновления UI (например, обновление канвы, установка фокуса).
+ * UIController is responsible for initializing and updating all JavaFX UI elements.
+ * It creates the main terminal window (CustomTerminalWindow), attaches input handlers,
+ * and provides methods to update the UI (such as updating the canvas and setting focus).
  */
 public class UIController {
 
@@ -20,53 +20,63 @@ public class UIController {
     private final CustomTerminalWindow customTerminalWindow;
 
     /**
-     * Конструктор UIController.
+     * Constructs a UIController.
      *
-     * @param primaryStage основной Stage JavaFX
-     * @param terminalApp  ссылка на координатора (TerminalApp)
-     * @param screenBuffer экранный буфер для терминала
-     * @param sshManager   экземпляр SSHManager (для передачи в InputHandler)
-     * @param cursor       объект курсора, используемый в терминале
+     * @param primaryStage the primary JavaFX Stage.
+     * @param terminalApp  the TerminalApp instance (the coordinator).
+     * @param screenBuffer the screen buffer for the terminal.
+     * @param sshManager   the SSHManager instance (passed to the InputHandler).
+     * @param cursor       the Cursor object used in the terminal.
      */
     public UIController(Stage primaryStage, TerminalApp terminalApp,
                         ScreenBuffer screenBuffer, SSHManager sshManager, Cursor cursor) {
         this.primaryStage = primaryStage;
         this.customTerminalWindow = new CustomTerminalWindow(primaryStage, terminalApp, screenBuffer);
-        // Создаём главное окно терминала, которое инкапсулирует все UI-элементы
+        // Create the main terminal window that encapsulates all UI elements
         this.terminalCanvas = this.customTerminalWindow.getTerminalCanvas();
 
-        // Инициализируем обработчик ввода и прикрепляем его к канве
+        // Initialize the input handler and attach it to the canvas
         InputHandler inputHandler = new InputHandler(terminalApp, sshManager, screenBuffer, cursor);
         terminalCanvas.setOnKeyPressed(inputHandler::handleKeyPressed);
         terminalCanvas.setOnKeyTyped(inputHandler::handleKeyTyped);
 
-        // Настраиваем сцену и окно через CustomTerminalWindow
+        // Configure the stage and window through CustomTerminalWindow
         customTerminalWindow.configureStage(primaryStage);
     }
 
     /**
-     * Показывает основное окно приложения и устанавливает фокус на канве.
+     * Shows the main application window and sets focus on the terminal canvas.
      */
     public void show() {
         primaryStage.show();
-        // Гарантируем, что после отображения окна фокус переходит на канву терминала
+        // Ensure that the terminal canvas receives focus after the window is displayed
         Platform.runLater(terminalCanvas::requestFocus);
     }
 
     /**
-     * Возвращает ссылку на TerminalCanvas.
+     * Returns the TerminalCanvas instance.
      *
-     * @return объект TerminalCanvas
+     * @return the TerminalCanvas.
      */
     public TerminalCanvas getTerminalCanvas() {
         return terminalCanvas;
     }
 
+    /**
+     * Returns the primary Stage.
+     *
+     * @return the primary Stage.
+     */
     public Stage getPrimaryStage() {
         return primaryStage;
     }
-    public ContentPanel getContentPanel() {
 
+    /**
+     * Returns the ContentPanel from the custom terminal window.
+     *
+     * @return the ContentPanel.
+     */
+    public ContentPanel getContentPanel() {
         return customTerminalWindow.getContentPanel();
     }
 }

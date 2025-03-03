@@ -7,7 +7,6 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.util.Duration;
-import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.ssh.SSHManager;
 import org.slf4j.Logger;
@@ -15,6 +14,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+/**
+ * InputHandler processes user input events from the terminal and handles key events.
+ * It supports clipboard operations, special key mappings (including VT220 escape sequences),
+ * and highlights the current cursor position.
+ */
 public class InputHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(InputHandler.class);
@@ -24,7 +28,14 @@ public class InputHandler {
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
 
-
+    /**
+     * Constructs an InputHandler with the given TerminalApp, SSHManager, ScreenBuffer, and Cursor.
+     *
+     * @param terminalApp  the main terminal application.
+     * @param sshConnector the SSH manager for sending data.
+     * @param screenBuffer the screen buffer.
+     * @param cursor       the terminal cursor.
+     */
     public InputHandler(TerminalApp terminalApp, SSHManager sshConnector, ScreenBuffer screenBuffer, Cursor cursor) {
         this.terminalApp = terminalApp;
         this.sshConnector = sshConnector;
@@ -32,10 +43,15 @@ public class InputHandler {
         this.cursor = cursor;
     }
 
+    /**
+     * Handles key pressed events.
+     *
+     * @param event the KeyEvent to process.
+     */
     public void handleKeyPressed(KeyEvent event) {
         KeyCode code = event.getCode();
 
-        // Проверка на сочетание клавиш Ctrl+C и Ctrl+V
+        // Check for key combinations Ctrl+C and Ctrl+V
         if (event.isControlDown()) {
             if (code == KeyCode.C) {
                 handleCtrlC();
@@ -45,16 +61,22 @@ public class InputHandler {
                 event.consume();
             }
         } else if (isSpecialKey(code)) {
-            // Обработка специальных клавиш
+            // Process special keys
             String escapeSequence = getVT220EscapeSequence(code);
             if (escapeSequence != null) {
                 sendToSSH(escapeSequence);
                 event.consume();
             }
         } else if (code == KeyCode.F5) {
-            handleF5KeyPress();}
+            handleF5KeyPress();
+        }
     }
 
+    /**
+     * Handles key typed events.
+     *
+     * @param event the KeyEvent to process.
+     */
     public void handleKeyTyped(KeyEvent event) {
         String character = event.getCharacter();
 
@@ -62,7 +84,7 @@ public class InputHandler {
             return;
         }
 
-        // Если введён символ новой строки, отправляем его как возврат каретки
+        // If a newline character is entered, send it as a carriage return.
         if (character.equals("\n")) {
             sendToSSH("\r");
         } else {
@@ -71,130 +93,158 @@ public class InputHandler {
         event.consume();
     }
 
-
-
+    /**
+     * Handles Ctrl+C key press.
+     * Copies selected text to the clipboard, or sends an interrupt signal if no text is selected.
+     */
     private void handleCtrlC() {
-        // Получаем выделенный текст из терминала
+        // Get the selected text from the terminal
         String selectedText = terminalApp.getSelectedText();
 
         if (selectedText != null && !selectedText.isEmpty()) {
-            // Копируем выделенный текст в буфер обмена
+            // Copy the selected text to the clipboard
             Clipboard clipboard = Clipboard.getSystemClipboard();
             ClipboardContent content = new ClipboardContent();
             content.putString(selectedText);
             clipboard.setContent(content);
 
-            logger.info("Текст скопирован в буфер обмена: {}", selectedText);
+            logger.info("Text wurde in die Zwischenablage kopiert: {}", selectedText);
         } else {
-            // Отправляем сигнал прерывания на сервер (Ctrl+C)
+            // Send an interrupt signal to the server (Ctrl+C)
             sendToSSH("\u0003"); // ASCII ETX (End of Text)
         }
     }
 
+    /**
+     * Handles Ctrl+V key press.
+     * Pastes text from the clipboard and sends it to the SSH server.
+     */
     private void handleCtrlV() {
         Clipboard clipboard = Clipboard.getSystemClipboard();
         if (clipboard.hasString()) {
             String clipboardText = clipboard.getString();
 
-            // Заменяем все варианты переноса строки на символ возврата каретки
+            // Replace all newline variants with a carriage return
             clipboardText = clipboardText.replace("\r\n", "\r").replace("\n", "\r");
 
-            // Отправляем вставленный текст на сервер
+            // Send the pasted text to the server
             sendToSSH(clipboardText);
         }
     }
 
-
-
-
+    /**
+     * Checks if the given key is a special key.
+     *
+     * @param code the KeyCode to check.
+     * @return true if it is a special key; false otherwise.
+     */
     private boolean isSpecialKey(KeyCode code) {
         return code == KeyCode.UP || code == KeyCode.DOWN || code == KeyCode.LEFT || code == KeyCode.RIGHT
                 || code == KeyCode.DELETE || code == KeyCode.HOME || code == KeyCode.END
                 || code == KeyCode.PAGE_UP || code == KeyCode.PAGE_DOWN || isFunctionKey(code);
     }
 
+    /**
+     * Checks if the given key is one of the function keys F1-F4.
+     *
+     * @param code the KeyCode to check.
+     * @return true if it is F1, F2, F3, or F4; false otherwise.
+     */
     private boolean isFunctionKey(KeyCode code) {
-        // Проверяем функциональные клавиши F1-F4
         return code == KeyCode.F1 || code == KeyCode.F2 || code == KeyCode.F3 || code == KeyCode.F4;
     }
 
+    /**
+     * Returns the VT220 escape sequence corresponding to the given special key.
+     *
+     * @param code the KeyCode for the key.
+     * @return the corresponding escape sequence, or null if none.
+     */
     private String getVT220EscapeSequence(KeyCode code) {
         return switch (code) {
-            case UP -> "\u001B[A"; // ESC [ A
-            case DOWN -> "\u001B[B"; // ESC [ B
-            case RIGHT -> "\u001B[C"; // ESC [ C
-            case LEFT -> "\u001B[D"; // ESC [ D
+            case UP -> "\u001B[A";      // ESC [ A
+            case DOWN -> "\u001B[B";    // ESC [ B
+            case RIGHT -> "\u001B[C";   // ESC [ C
+            case LEFT -> "\u001B[D";    // ESC [ D
             case DELETE -> "\u001B[3~"; // ESC [ 3 ~
-            case HOME -> "\u001B[H"; // ESC [ H
-            case END -> "\u001B[F"; // ESC [ F
-            case PAGE_UP -> "\u001B[5~"; // ESC [ 5 ~
+            case HOME -> "\u001B[H";    // ESC [ H
+            case END -> "\u001B[F";     // ESC [ F
+            case PAGE_UP -> "\u001B[5~";// ESC [ 5 ~
             case PAGE_DOWN -> "\u001B[6~"; // ESC [ 6 ~
-            case F1 -> "\u001BOP"; // ESC O P
-            case F2 -> "\u001BOQ"; // ESC O Q
-            case F3 -> "\u001BOR"; // ESC O R
-            case F4 -> "\u001BOS"; // ESC O S
+            case F1 -> "\u001BOP";      // ESC O P
+            case F2 -> "\u001BOQ";      // ESC O Q
+            case F3 -> "\u001BOR";      // ESC O R
+            case F4 -> "\u001BOS";      // ESC O S
             default -> null;
         };
     }
 
+    /**
+     * Highlights the current cursor position by changing the cell's background color to green.
+     * After one second, the original style is restored.
+     */
     public void highlightCursorPosition() {
-        // Получаем текущую позицию курсора
+        // Get the current cursor position
         int currentRow = cursor.getRow();
         int currentColumn = cursor.getColumn();
 
-        // Сохраняем текущий стиль ячейки
+        // Save the current cell style
         Cell currentCell = screenBuffer.getCell(currentRow, currentColumn);
-        String originalStyle = currentCell.getStyle();
+        String originalStyle = currentCell.style();
 
-        // Устанавливаем зелёный фон для ячейки курсора
+        // Set a green background for the cursor cell
         String highlightStyle = "-fx-fill: е; -rtfx-background-color: green;";
-        screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.getCharacter(), highlightStyle));
+        screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.character(), highlightStyle));
 
-
-
-        // Через 1 секунду восстанавливаем оригинальный стиль
+        // Restore the original style after 1 second
         Timeline restoreStyleTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-            screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.getCharacter(), originalStyle));
-
+            screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.character(), originalStyle));
         }));
         restoreStyleTimeline.setCycleCount(1);
         restoreStyleTimeline.play();
     }
 
+    /**
+     * Handles the F5 key press.
+     * Copies the current cursor position to the clipboard and highlights it.
+     */
     private void handleF5KeyPress() {
-        // Получаем текущую позицию курсора
-        int currentRow = cursor.getRow() + 1; // Строки обычно нумеруются с 1
-        int currentColumn = cursor.getColumn() + 1; // Столбцы тоже
+        // Get the current cursor position (rows and columns are 1-indexed)
+        int currentRow = cursor.getRow() + 1;
+        int currentColumn = cursor.getColumn() + 1;
 
-        // Форматируем строку с позицией курсора
-        String cursorPosition = String.format("Курсор на позиции: Строка %d, Столбец %d", currentRow, currentColumn);
+        // Format the string with the cursor position
+        String cursorPosition = String.format("Cursorposition: Zeile %d, Spalte %d", currentRow, currentColumn);
 
-        // Копируем позицию курсора в буфер обмена
+        // Copy the cursor position to the clipboard
         Clipboard clipboard = Clipboard.getSystemClipboard();
         ClipboardContent content = new ClipboardContent();
         content.putString(cursorPosition);
         clipboard.setContent(content);
 
-        // Логирование для отладки
-        logger.info("Позиция курсора скопирована в буфер обмена: {}", cursorPosition);
+        // Log for debugging
+        logger.info("Cursorposition wurde in die Zwischenablage kopiert: {}", cursorPosition);
 
-        // Подсветка позиции курсора зелёным цветом
+        // Highlight the cursor position in green
         highlightCursorPosition();
     }
 
+    /**
+     * Sends the specified data to the SSH server.
+     *
+     * @param data the string data to send.
+     */
     private void sendToSSH(String data) {
         SSHManager manager = terminalApp.getSSHManager();
         if (manager != null) {
             try {
                 manager.send(data);
-                logger.debug("Отправлено на SSH: {}", data);
+                logger.debug("Gesendet an SSH: {}", data);
             } catch (IOException e) {
-                logger.error("Ошибка при отправке данных через SSH: {}", e.getMessage(), e);
+                logger.error("Fehler beim Senden der Daten über SSH: {}", e.getMessage(), e);
             }
         } else {
-            logger.warn("SSHManager не установлен. Данные не отправлены: {}", data);
+            logger.warn("SSHManager ist nicht gesetzt. Daten wurden nicht gesendet: {}", data);
         }
     }
-
-
 }

@@ -34,7 +34,7 @@ public class CustomTerminalWindow {
     private static final int RESIZE_MARGIN = 8;
     private ResizeDirection resizeDir = ResizeDirection.NONE;
     private static final int TOP_BAR_HEIGHT = 30;
-    private static final int BOTTOM_BAR_HEIGHT = 60;
+    private static final int BOTTOM_BAR_HEIGHT = 30;
 
     // Направления изменения размера
     private enum ResizeDirection {
@@ -60,6 +60,8 @@ public class CustomTerminalWindow {
         VBox topContainer = new VBox();
         topContainer.getChildren().addAll(topBar, optionalMenuBar);
 
+        VBox.setMargin(optionalMenuBar, new Insets(0, 3, 0, 3));
+
         // Нижняя панель для ContentPanel (например, кнопки Pause/Stop)
         HBox bottomBar = createBottomBar();
 
@@ -68,7 +70,7 @@ public class CustomTerminalWindow {
         leftBorder.setPrefWidth(3);
         Region rightBorder = new Region();
         rightBorder.setPrefWidth(3);
-        Color borderColor = Color.rgb(0, 0, 0, 0.5);
+        Color borderColor = Color.rgb(0, 0, 0, 0.0);
         leftBorder.setBackground(new Background(new BackgroundFill(borderColor, CornerRadii.EMPTY, Insets.EMPTY)));
         rightBorder.setBackground(new Background(new BackgroundFill(borderColor, CornerRadii.EMPTY, Insets.EMPTY)));
 
@@ -87,7 +89,7 @@ public class CustomTerminalWindow {
         root.getStyleClass().add("root");
 
         double sceneWidth = initialCanvasWidth + 6; // учет боковых рамок
-        double sceneHeight = initialCanvasHeight + TOP_BAR_HEIGHT + BOTTOM_BAR_HEIGHT;
+        double sceneHeight = initialCanvasHeight + TOP_BAR_HEIGHT + BOTTOM_BAR_HEIGHT + 55;
         scene = new Scene(root, sceneWidth, sceneHeight);
         scene.setFill(Color.TRANSPARENT);
 
@@ -120,7 +122,7 @@ public class CustomTerminalWindow {
             terminalCanvas.requestFocus();
         });
         scene.heightProperty().addListener((observable, oldValue, newValue) -> {
-            double newCanvasHeight = newValue.doubleValue() - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT;
+            double newCanvasHeight = newValue.doubleValue() - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - 55;
             terminalCanvas.setHeight(newCanvasHeight);
             terminalCanvas.requestFocus();
         });
@@ -139,7 +141,7 @@ public class CustomTerminalWindow {
         topBar.setPadding(new Insets(5));
         topBar.setSpacing(5);
         // Задаем фон верхней панели с закруглением только верхних углов
-        Color topBarColor = Color.rgb(0, 0, 0, 0.5);
+        Color topBarColor = Color.rgb(0, 0, 0, 0.0);
         topBar.setBackground(new Background(new BackgroundFill(topBarColor, new CornerRadii(15,15,0,0,false), Insets.EMPTY)));
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -173,7 +175,7 @@ public class CustomTerminalWindow {
     private HBox createBottomBar() {
         HBox bottomBar = new HBox();
         bottomBar.setPrefHeight(BOTTOM_BAR_HEIGHT);
-        Color bottomBarColor = Color.rgb(0, 0, 0, 0.5);
+        Color bottomBarColor = Color.rgb(0, 0, 0, 0.0);
         // Задаем фон нижней панели с закруглением только нижних углов
         bottomBar.setBackground(new Background(new BackgroundFill(bottomBarColor, new CornerRadii(0,0,15,15,false), Insets.EMPTY)));
         this.contentPanel = new ContentPanel(primaryStage, terminalApp);

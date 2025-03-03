@@ -1,4 +1,3 @@
-
 package org.msv.vt100.ssh;
 
 import com.jcraft.jsch.ChannelShell;
@@ -15,10 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer; /**
- * SSHManager – современный сервис для работы с SSH.
- * Он устанавливает соединение, читает входящие данные в отдельном потоке,
- * уведомляет подписчиков (listeners) о поступлении данных, а также предоставляет метод для отправки данных.
+import java.util.function.Consumer;
+
+/**
+ * SSHManager is a modern service for handling SSH connections.
+ * It establishes a connection, reads incoming data on a separate thread,
+ * notifies registered listeners about incoming data, and provides a method for sending data.
  */
 public class SSHManager {
     private static final Logger logger = LoggerFactory.getLogger(SSHManager.class);
@@ -29,20 +30,27 @@ public class SSHManager {
     private InputStream inputStream;
     private OutputStream outputStream;
 
-    // Используем современные executor‑ы
+    // Using modern executors for asynchronous operations
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    // Для уведомления о входящих данных используем потокобезопасный список слушателей
+    // Thread-safe list for data listeners
     private final List<Consumer<String>> dataListeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
 
+    /**
+     * Constructs an SSHManager with the given SSH configuration.
+     *
+     * @param config the SSH configuration details.
+     */
     public SSHManager(SSHConfig config) {
         this.config = config;
     }
 
     /**
-     * Асинхронное установление SSH‑соединения.
+     * Asynchronously establishes an SSH connection.
+     *
+     * @return a CompletableFuture that completes when the connection is established.
      */
     public CompletableFuture<Void> connectAsync() {
         return CompletableFuture.runAsync(() -> {
@@ -55,44 +63,48 @@ public class SSHManager {
     }
 
     /**
-     * Устанавливает SSH-соединение с использованием JSch.
+     * Establishes an SSH connection using JSch.
+     *
+     * @throws JSchException if a JSch error occurs.
+     * @throws IOException   if an I/O error occurs.
      */
     private void connect() throws JSchException, IOException {
         JSch jsch = new JSch();
         jsch.addIdentity(config.privateKeyPath());
         session = jsch.getSession(config.user(), config.host(), config.port());
         session.setConfig("StrictHostKeyChecking", "no");
-        logger.info("Подключение к {}:{} с пользователем {}", config.host(), config.port(), config.user());
-        session.connect(30000); // таймаут 30 секунд
+        logger.info("Verbinde zu {}:{} mit Benutzer {}", config.host(), config.port(), config.user());
+        session.connect(30000); // Timeout 30 seconds
 
         channel = (ChannelShell) session.openChannel("shell");
-        // Получаем потоки ввода-вывода
+        // Obtain input and output streams
         inputStream = channel.getInputStream();
         outputStream = channel.getOutputStream();
         channel.connect(30000);
         isConnected.set(true);
-        logger.info("SSH-соединение установлено.");
+        logger.info("SSH-Verbindung hergestellt.");
 
         startReading();
     }
 
     /**
-     * Отправляет данные на SSH-сервер.
-     * @param data строка данных
-     * @throws IOException при ошибке записи в поток
+     * Sends data to the SSH server.
+     *
+     * @param data the string data to send.
+     * @throws IOException if an error occurs while writing to the stream.
      */
     public void send(String data) throws IOException {
         if (!isConnected.get()) {
-            throw new IllegalStateException("SSH-соединение не установлено.");
+            throw new IllegalStateException("SSH-Verbindung ist nicht hergestellt.");
         }
         outputStream.write(data.getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
-        logger.debug("Отправлено: {}", data);
+        logger.debug("Gesendet: {}", data);
     }
 
     /**
-     * Асинхронное чтение входящих данных.
-     * При получении данных вызываются все зарегистрированные слушатели.
+     * Asynchronously reads incoming data.
+     * When data is received, all registered listeners are notified.
      */
     private void startReading() {
         executor.submit(() -> {
@@ -101,24 +113,26 @@ public class SSHManager {
                 int bytesRead;
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     String received = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
-                    logger.debug("Получено: {}", received);
+                    logger.debug("Empfangen: {}", received);
                     dataListeners.forEach(listener -> listener.accept(received));
                 }
             } catch (IOException e) {
-                logger.error("Ошибка чтения SSH-данных", e);
+                logger.error("Fehler beim Lesen der SSH-Daten", e);
             }
         });
     }
 
     /**
-     * Добавляет слушателя для входящих данных.
+     * Adds a listener to receive incoming SSH data.
+     *
+     * @param listener a Consumer that processes incoming string data.
      */
     public void addDataListener(Consumer<String> listener) {
         dataListeners.add(listener);
     }
 
     /**
-     * Отключает SSH-соединение и завершает все фоновые executor‑ы.
+     * Disconnects the SSH connection and shuts down all background executors.
      */
     public void disconnect() {
         if (channel != null && channel.isConnected()) {
@@ -129,19 +143,23 @@ public class SSHManager {
         }
         shutdownExecutors();
         isConnected.set(false);
-        logger.info("SSH-соединение закрыто.");
+        logger.info("SSH-Verbindung geschlossen.");
     }
 
     /**
-     * Корректное завершение executor‑ов.
+     * Properly shuts down the executors.
      */
     private void shutdownExecutors() {
         executor.shutdownNow();
         scheduler.shutdownNow();
     }
+
+    /**
+     * Checks whether the SSH connection is currently established.
+     *
+     * @return true if connected, false otherwise.
+     */
     public boolean isConnected() {
         return isConnected.get();
     }
-
 }
-

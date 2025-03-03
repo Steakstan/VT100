@@ -17,13 +17,23 @@ public class FileProcessingService {
 
     private static final Logger logger = LoggerFactory.getLogger(FileProcessingService.class);
 
-    private SSHManager sshManager;
-    private Cursor cursor;
-    private TerminalApp terminalApp;
-    private ScreenTextDetector screenTextDetector;
-    private AtomicBoolean isPaused;
-    private AtomicBoolean isStopped;
+    private final SSHManager sshManager;
+    private final Cursor cursor;
+    private final TerminalApp terminalApp;
+    private final ScreenTextDetector screenTextDetector;
+    private final AtomicBoolean isPaused;
+    private final AtomicBoolean isStopped;
 
+    /**
+     * Constructs a FileProcessingService.
+     *
+     * @param sshManager        the SSHManager instance for communication.
+     * @param cursor            the terminal cursor.
+     * @param terminalApp       the main TerminalApp instance.
+     * @param screenTextDetector the screen text detector.
+     * @param isPaused          a flag to pause processing.
+     * @param isStopped         a flag to stop processing.
+     */
     public FileProcessingService(SSHManager sshManager,
                                  Cursor cursor,
                                  TerminalApp terminalApp,
@@ -38,8 +48,15 @@ public class FileProcessingService {
         this.isStopped = isStopped;
     }
 
+    /**
+     * Processes the Excel file based on the specified choice.
+     *
+     * @param choice        the type of processing to perform.
+     * @param excelFilePath the path to the Excel file.
+     * @throws InterruptedException if processing is interrupted.
+     */
     public void processFile(int choice, String excelFilePath) throws InterruptedException {
-        logger.info("Открытие Excel файла: {}", excelFilePath);
+        logger.info("Opening Excel file: {}", excelFilePath);
         isPaused.set(false);
         isStopped.set(false);
         try (FileInputStream fileInputStream = new FileInputStream(excelFilePath);
@@ -48,19 +65,19 @@ public class FileProcessingService {
             Sheet sheet = workbook.getSheetAt(0);
             Row firstRow = sheet.getRow(0);
             if (firstRow == null) {
-                logger.error("Excel файл пуст. Выход.");
+                logger.error("Excel file is empty. Exiting.");
                 return;
             }
 
             int columnCount = firstRow.getLastCellNum();
             if (choice == 1 && columnCount < 3) {
-                logger.error("Неверный формат таблицы для обработки заказов. Ожидается минимум 3 столбца.");
+                logger.error("Invalid table format for order processing. At least 3 columns expected.");
                 return;
             } else if ((choice == 2 || choice == 3) && columnCount != 2) {
-                logger.error("Неверный формат таблицы для обработки комментариев. Ожидается 2 столбца.");
+                logger.error("Invalid table format for comment processing. Exactly 2 columns expected.");
                 return;
             } else if (choice == 4 && columnCount < 3) {
-                logger.error("Неверный формат таблицы для обработки дат поставки. Ожидается минимум 3 столбца.");
+                logger.error("Invalid table format for delivery date processing. At least 3 columns expected.");
                 return;
             }
 
@@ -72,10 +89,10 @@ public class FileProcessingService {
                 DeliveryDateProcessor deliveryDateProcessor = new DeliveryDateProcessor(sshManager, cursor, terminalApp, screenTextDetector);
                 deliveryDateProcessor.processDeliveryDates(rows);
             } else {
-                logger.warn("Обработка для выбранного типа (choice = {}) не реализована.", choice);
+                logger.warn("Processing for the selected type (choice = {}) is not implemented.", choice);
             }
         } catch (Exception e) {
-            logger.error("Ошибка при обработке файла: {}", excelFilePath, e);
+            logger.error("Error processing file: {}", excelFilePath, e);
         }
     }
 }

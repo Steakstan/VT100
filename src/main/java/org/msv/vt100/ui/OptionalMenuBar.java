@@ -18,9 +18,10 @@ public class OptionalMenuBar extends HBox {
 
     public OptionalMenuBar(Stage primaryStage, TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
-        setSpacing(10);
-        setPadding(new Insets(5));
-        setStyle("-fx-background-color: rgba(0, 0, 0, 0.5);");
+        setSpacing(1);
+        getStyleClass().add("custom-tab-header");
+
+
         setAlignment(Pos.CENTER_LEFT);
 
         // Создаем кнопки меню
@@ -59,10 +60,6 @@ public class OptionalMenuBar extends HBox {
     private Button createMenuButton(String text) {
         Button button = new Button(text);
         button.getStyleClass().add("menu-button");
-        // Базовая стилизация задается через CSS, но можно также указать inline
-        button.setStyle("-fx-background-color: transparent; -fx-text-fill: white;");
-        button.setOnMouseEntered(e -> button.setStyle("-fx-background-color: white; -fx-text-fill: black;"));
-        button.setOnMouseExited(e -> button.setStyle("-fx-background-color: transparent; -fx-text-fill: white;"));
         return button;
     }
 
@@ -134,7 +131,7 @@ public class OptionalMenuBar extends HBox {
                 break;
             default:
                 content.getChildren().add(
-                        createActionButton("Пока не реализовано", popup::hide)
+                        createActionButton("Nicht realisiert", popup::hide)
                 );
         }
         popup.getContent().add(content);
@@ -166,12 +163,5 @@ public class OptionalMenuBar extends HBox {
      */
     private void styleMenuButton(Button button) {
         button.getStyleClass().add("menu-item");
-        button.setStyle("-fx-background-color: transparent; -fx-text-fill: white;");
-        button.addEventHandler(MouseEvent.MOUSE_ENTERED, e ->
-                button.setStyle("-fx-background-color: white; -fx-text-fill: black;")
-        );
-        button.addEventHandler(MouseEvent.MOUSE_EXITED, e ->
-                button.setStyle("-fx-background-color: transparent; -fx-text-fill: white;")
-        );
     }
 }

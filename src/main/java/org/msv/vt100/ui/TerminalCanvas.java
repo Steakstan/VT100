@@ -13,38 +13,57 @@ import org.msv.vt100.core.ScreenBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * TerminalCanvas is a custom Canvas for rendering the terminal screen.
+ * It displays the contents of a ScreenBuffer and handles drawing of characters,
+ * box-drawing symbols, and cursor highlighting.
+ */
 public class TerminalCanvas extends Canvas {
 
     private final ScreenBuffer screenBuffer;
     private double cellWidth;
     private double cellHeight;
 
-    // Поля для відображення курсора
+    // Fields for displaying the cursor
     public boolean cursorVisible = true;
     private int cursorRow = -1;
     private int cursorCol = -1;
 
+    /**
+     * Constructs a TerminalCanvas with the given screen buffer and dimensions.
+     *
+     * @param screenBuffer the screen buffer containing terminal cells.
+     * @param width        the width of the canvas.
+     * @param height       the height of the canvas.
+     */
     public TerminalCanvas(ScreenBuffer screenBuffer, double width, double height) {
         super(width, height);
         this.screenBuffer = screenBuffer;
         recalcCellDimensions();
     }
 
+    /**
+     * Recalculates the cell dimensions based on the canvas size and the screen buffer.
+     */
     private void recalcCellDimensions() {
         int cols = screenBuffer.getColumns();
         int rows = screenBuffer.getRows();
-        cellWidth  = getWidth()  / cols;
+        cellWidth = getWidth() / cols;
         cellHeight = getHeight() / rows;
         double newFontSize = cellHeight * 0.8;
-        // Базовий шрифт – без особливостей форматування, його будемо перевизначати для кожної комірки
+        // Base font – without additional formatting features, which will be overridden per cell
         Font font = Font.font("Consolas", newFontSize);
     }
 
+    /**
+     * Updates the terminal screen by recalculating cell dimensions, clearing the canvas,
+     * and rendering each cell of the screen buffer.
+     */
     public void updateScreen() {
         recalcCellDimensions();
         GraphicsContext gc = getGraphicsContext2D();
 
-        // Очищення фону всієї канви
+        // Clear the background of the entire canvas
         gc.setFill(Color.rgb(0, 43, 54, 0.95));
         gc.fillRect(0, 0, getWidth(), getHeight());
 
@@ -60,18 +79,15 @@ public class TerminalCanvas extends Canvas {
                 double y = row * cellHeight;
 
                 Cell cell = screenBuffer.getCell(row, col);
-                String character = cell.getCharacter();
-                String style = cell.getStyle();
+                String character = cell.character();
+                String style = cell.style();
 
-                // Парсимо рядок стилів, який формується в TextFormater, наприклад:
-                // "fill: white; background: transparent; underline: true; font-weight: bold;"
                 Map<String, String> styleMap = parseStyleString(style);
                 String fillColor = styleMap.getOrDefault("fill", "white");
                 String backgroundColor = styleMap.getOrDefault("background", "transparent");
                 boolean underline = "true".equalsIgnoreCase(styleMap.get("underline"));
                 String fontWeight = styleMap.getOrDefault("font-weight", "normal");
 
-                // Формуємо шрифт для комірки залежно від жирності
                 Font cellFont;
                 if (fontWeight.equalsIgnoreCase("bold")) {
                     cellFont = Font.font("Consolas", FontWeight.BOLD, cellHeight * 0.8);
@@ -79,20 +95,16 @@ public class TerminalCanvas extends Canvas {
                     cellFont = Font.font("Consolas", cellHeight * 0.8);
                 }
 
-                // Малюємо фон комірки
+                // Draw the cell background
                 gc.setFill(backgroundColor.equals("transparent") ? Color.TRANSPARENT : Color.web(backgroundColor));
                 gc.fillRect(x, y, cellWidth, cellHeight);
 
-                // Перевіряємо, чи знаходиться курсор у цій комірці
                 boolean isCursorCell = (row == cursorRow && col == cursorCol && cursorVisible);
 
-                // Якщо символ – псевдографічний (наприклад, "┌", "─" тощо),
-                // він уже має бути перетворений класом CharsetSwitchHandler, тому перевіряємо лише набір Unicode‑символів.
                 if (isBoxDrawingChar(character)) {
                     char c = character.charAt(0);
                     drawBoxCharacter(gc, c, x, y, cellWidth, cellHeight, backgroundColor, fillColor, isCursorCell);
                 } else {
-                    // Малюємо звичайний текст з використанням заданого шрифту та кольорів
                     gc.setFont(cellFont);
                     Color textColor = Color.web(fillColor);
                     if (isCursorCell) {
@@ -103,7 +115,6 @@ public class TerminalCanvas extends Canvas {
                     gc.setFill(textColor);
                     gc.fillText(character, x + cellWidth / 2, y + cellHeight / 2);
 
-                    // Якщо задано підкреслення – малюємо лінію внизу комірки
                     if (underline) {
                         gc.setStroke(textColor);
                         gc.setLineWidth(1);
@@ -116,17 +127,27 @@ public class TerminalCanvas extends Canvas {
     }
 
     /**
-     * Метод для визначення, чи є рядок символом псевдографіки.
-     * Тут перевіряємо лише Unicode-символи, які має показувати термінал.
+     * Determines whether the given character string is a box drawing symbol.
+     *
+     * @param ch the character string to check.
+     * @return true if the string is a box drawing character; false otherwise.
      */
     private boolean isBoxDrawingChar(String ch) {
         return "┌┐└┘├┤┬┴┼│─".contains(ch);
     }
 
     /**
-     * Малює псевдографічний символ у межах комірки.
-     * Оскільки символи вже оброблені класом CharsetSwitchHandler,
-     * тут не потрібно робити додаткову конвертацію – використовується саме отриманий символ.
+     * Draws a box-drawing character within a cell.
+     *
+     * @param gc              the GraphicsContext to draw on.
+     * @param c               the box-drawing character.
+     * @param x               the x-coordinate of the cell.
+     * @param y               the y-coordinate of the cell.
+     * @param w               the width of the cell.
+     * @param h               the height of the cell.
+     * @param backgroundColor the background color of the cell.
+     * @param fillColor       the fill color for the box lines.
+     * @param isCursorCell    whether this cell is the current cursor cell.
      */
     private void drawBoxCharacter(GraphicsContext gc,
                                   char c,
@@ -135,7 +156,7 @@ public class TerminalCanvas extends Canvas {
                                   String backgroundColor,
                                   String fillColor,
                                   boolean isCursorCell) {
-        // Малюємо фон комірки
+        // Draw the cell background
         gc.setFill(backgroundColor.equals("transparent") ? Color.TRANSPARENT : Color.web(backgroundColor));
         gc.fillRect(x, y, w, h);
 
@@ -146,31 +167,31 @@ public class TerminalCanvas extends Canvas {
         gc.setStroke(lineColor);
         gc.setLineWidth(2);
 
-        double right  = x + w;
+        double right = x + w;
         double bottom = y + h;
-        double midX   = x + w / 2.0;
-        double midY   = y + h / 2.0;
+        double midX = x + w / 2.0;
+        double midY = y + h / 2.0;
 
         switch (c) {
-            case '─': // Горизонтальна лінія
+            case '─':
                 gc.strokeLine(x, midY, right, midY);
                 break;
-            case '│': // Вертикальна лінія
+            case '│':
                 gc.strokeLine(midX, y, midX, bottom);
                 break;
-            case '┌': // Верхній лівий кут
+            case '┌':
                 gc.strokeLine(midX, midY, right, midY);
                 gc.strokeLine(midX, midY, midX, bottom);
                 break;
-            case '┐': // Верхній правий кут
+            case '┐':
                 gc.strokeLine(x, midY, midX, midY);
                 gc.strokeLine(midX, midY, midX, bottom);
                 break;
-            case '└': // Нижній лівий кут
+            case '└':
                 gc.strokeLine(midX, y, midX, midY);
                 gc.strokeLine(midX, midY, right, midY);
                 break;
-            case '┘': // Нижній правий кут
+            case '┘':
                 gc.strokeLine(midX, y, midX, midY);
                 gc.strokeLine(x, midY, midX, midY);
                 break;
@@ -198,8 +219,10 @@ public class TerminalCanvas extends Canvas {
     }
 
     /**
-     * Допоміжний метод для парсингу рядка стилів.
-     * Рядок стилів очікується у форматі: "fill: white; background: transparent; underline: true; font-weight: bold;"
+     * Parses a style string into a map of style properties.
+     *
+     * @param style the style string in the format "key: value; key: value; ..."
+     * @return a map of style property names to values.
      */
     private Map<String, String> parseStyleString(String style) {
         Map<String, String> styleMap = new HashMap<>();
@@ -213,6 +236,12 @@ public class TerminalCanvas extends Canvas {
         return styleMap;
     }
 
+    /**
+     * Sets the cursor position to be highlighted on the terminal.
+     *
+     * @param row the row index (0-indexed)
+     * @param col the column index (0-indexed)
+     */
     public void setCursorPosition(int row, int col) {
         this.cursorRow = row;
         this.cursorCol = col;

@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -33,17 +34,22 @@ public class LogSettingsDialog {
     private static final String PREF_LOG_ENABLED = "logEnabled";
     private static final String DEFAULT_LOG_PATH = "C:\\Users\\Documents";
 
+    /**
+     * Constructs a LogSettingsDialog for configuring logging settings.
+     *
+     * @param terminalApp the main TerminalApp instance.
+     */
     public LogSettingsDialog(TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
         prefs = Preferences.userNodeForPackage(LogSettingsDialog.class);
 
-        // Создаем диалог с прозрачным стилем
+        // Create a dialog with a transparent style
         dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("Log Einstellungen");
 
-        // Заголовок диалога
+        // Dialog header with title and close button – similar to LogSettingsDialog style
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -59,26 +65,26 @@ public class LogSettingsDialog {
 
         header.getChildren().addAll(titleLabel, spacer, headerCloseButton);
 
-        // Основное содержимое – GridPane
+        // Main content – GridPane layout
         GridPane grid = new GridPane();
         grid.getStyleClass().add("dialog-grid");
 
-        // Метка "Log Path:" – бирюзовая
-        Label pathLabel = new Label("Log Path:");
+        // Label "Protokollpfad:" in turquoise
+        Label pathLabel = new Label("Protokollpfad:");
         pathLabel.getStyleClass().add("dialog-label-turquoise");
 
-        // Поле ввода лог-пути
+        // Text field for log path
         logPathField = new TextField();
         logPathField.getStyleClass().add("dialog-text-field");
         String storedPath = prefs.get(PREF_LOG_PATH, DEFAULT_LOG_PATH);
         logPathField.setText(storedPath);
 
-        // Кнопка Browse
-        browseButton = new Button("Browse");
+        // "Durchsuchen" button for browsing directories
+        browseButton = new Button("Durchsuchen");
         browseButton.getStyleClass().add("dialog-button");
         browseButton.setOnAction(e -> {
             DirectoryChooser directoryChooser = new DirectoryChooser();
-            directoryChooser.setTitle("Select Log Directory");
+            directoryChooser.setTitle("Wählen Sie ein Protokollverzeichnis aus");
             File selectedDirectory = directoryChooser.showDialog(dialog);
             if (selectedDirectory != null) {
                 logPathField.setText(selectedDirectory.getAbsolutePath());
@@ -88,12 +94,12 @@ public class LogSettingsDialog {
         HBox pathBox = new HBox(5, logPathField, browseButton);
         pathBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Метка "Enable Logging:" – бирюзовая
-        Label enableLabel = new Label("Enable Logging:");
+        // Label "Protokollierung aktivieren:" in turquoise
+        Label enableLabel = new Label("Protokollierung aktivieren:");
         enableLabel.getStyleClass().add("dialog-label-turquoise");
 
         enableLoggingCheckBox = new CheckBox();
-        // Для чекбокса можно оставить стиль по умолчанию или задать при необходимости
+        // Optionally style the checkbox; here text color is set to white.
         enableLoggingCheckBox.setStyle("-fx-text-fill: white;");
         boolean isEnabled = prefs.getBoolean(PREF_LOG_ENABLED, false);
         enableLoggingCheckBox.setSelected(isEnabled);
@@ -101,33 +107,33 @@ public class LogSettingsDialog {
         HBox enableBox = new HBox(5, enableLabel, enableLoggingCheckBox);
         enableBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Кнопки Save и Cancel
-        saveButton = new Button("Save");
+        // Save and Cancel buttons
+        saveButton = new Button("Speichern");
         saveButton.getStyleClass().add("dialog-button");
         saveButton.setOnAction(e -> saveSettings());
 
-        cancelButton = new Button("Cancel");
+        cancelButton = new Button("Abbrechen");
         cancelButton.getStyleClass().add("dialog-button");
         cancelButton.setOnAction(e -> dialog.close());
 
         HBox buttonBox = new HBox(10, saveButton, cancelButton);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
 
-        // Расположение элементов в GridPane
+        // Layout of elements in the GridPane
         grid.add(pathLabel, 0, 0);
         grid.add(pathBox, 1, 0);
         grid.add(enableLabel, 0, 1);
         grid.add(enableLoggingCheckBox, 1, 1);
         grid.add(buttonBox, 1, 2);
 
-        // Корневой контейнер диалога
+        // Root container of the dialog
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);
         root.setCenter(grid);
         root.setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, null, null)));
 
-        // Клип с закругленными углами для эффекта
+        // Apply a clip with rounded corners for effect
         Rectangle clip = new Rectangle(540, 150);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
@@ -136,12 +142,15 @@ public class LogSettingsDialog {
         Scene scene = new Scene(root, 540, 150);
         scene.setFill(Color.TRANSPARENT);
 
-        // Подключаем CSS-файл (путь зависит от структуры проекта)
+        // Load CSS styles (path may vary depending on your project structure)
         scene.getStylesheets().add(getClass().getResource("/org/msv/vt100/ui/styles.css").toExternalForm());
 
         dialog.setScene(scene);
     }
 
+    /**
+     * Saves the logging settings and applies them to the TerminalApp.
+     */
     private void saveSettings() {
         String logPath = logPathField.getText().trim();
         boolean logEnabled = enableLoggingCheckBox.isSelected();
@@ -157,6 +166,9 @@ public class LogSettingsDialog {
         dialog.close();
     }
 
+    /**
+     * Displays the dialog and waits for user input.
+     */
     public void show() {
         Platform.runLater(() -> dialog.showAndWait());
     }

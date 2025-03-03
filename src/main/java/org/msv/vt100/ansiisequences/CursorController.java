@@ -97,7 +97,7 @@ public class CursorController {
 
             // Get the current cell content
             Cell currentCell = screenBuffer.getCell(cursor.getRow(), cursor.getColumn());
-            String existingChar = currentCell.getCharacter();
+            String existingChar = currentCell.character();
 
             // Append the symbol to the existing character
             String newChar = existingChar + symbol;

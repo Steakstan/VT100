@@ -23,11 +23,10 @@ public class ContentPanel extends BorderPane {
         // Изначально контейнер для обработки пустой
         processingButtons = new HBox(10);
         processingButtons.setAlignment(Pos.TOP_LEFT);
-        processingButtons.setPadding(new Insets(5, 10, 5, 10));
+        //processingButtons.setPadding(new Insets(0, 10, 0, 10));
 
-        // Верхняя панель содержит только Log кнопку (можно расширить по необходимости)
         HBox topBar = new HBox();
-        topBar.setPadding(new Insets(5));
+        //topBar.setPadding(new Insets(5));
         topBar.setAlignment(Pos.TOP_LEFT);
 
         // Располагаем верхнюю панель сверху, а нижнюю – для кнопок обработки
@@ -38,14 +37,14 @@ public class ContentPanel extends BorderPane {
     // Методы для создания кнопок Pause и Stop
     private Button createPauseButton() {
         Button button = new Button("Pause");
-        button.getStyleClass().add("rounded-button");
+        button.getStyleClass().add("dialog-button");
         button.setOnAction(e -> pauseOrResumeProcessing(button));
         return button;
     }
 
     private Button createStopButton() {
         Button button = new Button("Stop");
-        button.getStyleClass().add("rounded-button");
+        button.getStyleClass().add("dialog-button");
         button.setOnAction(e -> stopProcessing());
         return button;
     }
@@ -75,9 +74,9 @@ public class ContentPanel extends BorderPane {
             processingButtons.setMinHeight(60);
             processingButtons.setPrefHeight(60);
             // Устанавливаем отступы: 10 пикселей сверху, снизу и по бокам
-            BorderPane.setMargin(processingButtons, new Insets(-10, 5, 10, 10));
+            BorderPane.setMargin(processingButtons, new Insets(10, 5, 10, 10));
             // Центрируем кнопки
-            BorderPane.setAlignment(processingButtons, Pos.CENTER);
+            BorderPane.setAlignment(processingButtons, Pos.CENTER_LEFT);
             this.setBottom(processingButtons);
         });
     }
