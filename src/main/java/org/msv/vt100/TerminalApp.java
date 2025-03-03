@@ -24,13 +24,20 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * TerminalApp is a JavaFX application that emulates a VT520-type terminal with SSH connectivity.
+ * It is adapted for integration with SHD’s order management software.
+ * <p>
+ * All user-visible messages (logs, button labels, etc.) have been localized to German.
+ * </p>
+ */
 public class TerminalApp extends Application {
 
     private static final Logger logger = LoggerFactory.getLogger(TerminalApp.class);
     private static final int COLUMNS = 80;
     private static final int ROWS = 25;
 
-    // Компоненты логики терминала
+    // Terminal logic components
     private Cursor cursor;
     private CursorVisibilityManager cursorVisibilityManager;
     private ScreenBuffer screenBuffer;
@@ -41,10 +48,10 @@ public class TerminalApp extends Application {
     private CustomTerminalWindow customTerminalWindow;
     private SSHConfig currentProfile;
 
-    // Новый SSH-сервис
+    // SSH service
     private SSHManager sshManager;
 
-    // Флаги управления процессами
+    // Process control flags
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
     private final ReentrantLock pauseLock = new ReentrantLock();
@@ -52,10 +59,15 @@ public class TerminalApp extends Application {
     private FileProcessingService fileProcessingService;
     private Thread processingThread;
 
-
-    // Логирование
+    // Logging flag
     private boolean isLoggingEnabled = false;
 
+    /**
+     * The start method initializes the SSH connection, terminal components, UI, and file processing service.
+     * It also sets up the periodic screen update and the shutdown hook.
+     *
+     * @param primaryStage the main stage of the JavaFX application
+     */
     @Override
     public void start(Stage primaryStage) {
         initializeSSHManager();
@@ -64,6 +76,7 @@ public class TerminalApp extends Application {
         initializeFileProcessingService();
         cursorVisibilityManager.showCursor();
 
+        // On application close, disconnect SSH
         primaryStage.setOnCloseRequest(event -> {
             if (sshManager != null) {
                 sshManager.disconnect();
@@ -74,7 +87,8 @@ public class TerminalApp extends Application {
     }
 
     /**
-     * Инициализирует SSHManager.
+     * Initializes the SSHManager by checking for an auto-connect profile.
+     * If none exists, it shows the profile selection dialog.
      */
     private void initializeSSHManager() {
         List<SSHConfig> profiles = SSHProfileManager.getProfiles();
@@ -82,35 +96,38 @@ public class TerminalApp extends Application {
         if (autoProfile != null) {
             connectWithConfig(autoProfile);
         } else {
-            // Показываем диалог профилей с основным окном как owner
+            // Show the profile dialog with the main window as owner
             Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
             chosen.ifPresent(this::connectWithConfig);
         }
     }
 
-
-
+    /**
+     * Connects to an SSH server using the provided configuration.
+     * If already connected, the existing connection is disconnected.
+     *
+     * @param config the SSH configuration to use for connection
+     */
     private void connectWithConfig(SSHConfig config) {
         if (sshManager != null && sshManager.isConnected()) {
             sshManager.disconnect();
         }
         try {
-            currentProfile = config; // сохраняем профиль
+            currentProfile = config; // Save the profile
             sshManager = new SSHManager(config);
             sshManager.addDataListener(data -> Platform.runLater(() -> processInput(data.toCharArray())));
             sshManager.connectAsync().exceptionally(ex -> {
-                System.err.println("Ошибка подключения по SSH: " + ex.getMessage());
+                System.err.println("SSH-Verbindungsfehler: " + ex.getMessage());
                 return null;
             });
         } catch (Exception e) {
-            System.err.println("Ошибка при инициализации SSHManager: " + e.getMessage());
+            System.err.println("Fehler bei der Initialisierung von SSHManager: " + e.getMessage());
         }
     }
 
-
-
-
-
+    /**
+     * Initializes terminal components such as the cursor, screen buffer, text formatter, and various handlers.
+     */
     private void initializeComponents() {
         cursor = new Cursor(ROWS, COLUMNS);
         cursorVisibilityManager = new CursorVisibilityManager();
@@ -167,40 +184,62 @@ public class TerminalApp extends Application {
         );
     }
 
-
+    /**
+     * Initializes the user interface using JavaFX.
+     *
+     * @param primaryStage the primary stage for the UI
+     */
     private void initializeUI(Stage primaryStage) {
         uiController = new UIController(primaryStage, this, screenBuffer, sshManager, cursor);
         uiController.show();
     }
+
+    /**
+     * Opens the "Bearbeitungseinstellungen" dialog (i.e., editing settings dialog).
+     */
     public void openBearbeitungseinstellungenDialog() {
         BearbeitungseinstellungenDialog dialog = new BearbeitungseinstellungenDialog(this);
         dialog.show();
     }
 
-
+    /**
+     * Initializes the file processing service for Excel file handling.
+     */
     private void initializeFileProcessingService() {
-        // Сервис обработки Excel файлов
+        // Excel file processing service
         this.fileProcessingService = new FileProcessingService(sshManager, cursor, this, screenTextDetector, isPaused, isStopped);
     }
+
+    /**
+     * Shows the processing buttons and prints a message in German.
+     */
     public void showProcessingButtons() {
         uiController.getContentPanel().showProcessingButtons();
-        System.out.println("The button in the donwbar on");
+        System.out.println("Schaltfläche in der unteren Leiste aktiviert");
     }
 
+    /**
+     * Hides the processing buttons and prints a message in German.
+     */
     public void hideProcessingButtons() {
         uiController.getContentPanel().hideProcessingButtons();
-        System.out.println("The button in the donwbar off");
+        System.out.println("Schaltfläche in der unteren Leiste deaktiviert");
     }
 
-
+    /**
+     * Updates the terminal screen by setting the cursor position, updating the cursor visibility,
+     * and rendering the canvas.
+     */
     void updateScreen() {
         TerminalCanvas canvas = uiController.getTerminalCanvas();
         canvas.setCursorPosition(cursor.getRow(), cursor.getColumn());
         canvas.cursorVisible = cursorVisibilityManager.isCursorVisible();
-        canvas.updateScreen();  // Отрисовка канвы
+        canvas.updateScreen();  // Render the canvas
     }
 
-    // Метод для старта таймера обновления экрана
+    /**
+     * Starts the periodic screen updater (approximately every 33ms).
+     */
     private void startScreenUpdater() {
         Timeline screenUpdateTimeline = new Timeline(
                 new KeyFrame(Duration.millis(33), event -> updateScreen())
@@ -209,14 +248,25 @@ public class TerminalApp extends Application {
         screenUpdateTimeline.play();
     }
 
+    /**
+     * Processes input characters from the SSH data stream.
+     *
+     * @param inputChars an array of characters received from SSH
+     */
     public void processInput(char[] inputChars) {
         inputProcessor.processInput(inputChars);
     }
 
+    /**
+     * Pauses the processing of incoming data.
+     */
     public void pauseProcessing() {
         isPaused.set(true);
     }
 
+    /**
+     * Resumes the processing of incoming data.
+     */
     public void resumeProcessing() {
         isPaused.set(false);
         synchronized (pauseCondition) {
@@ -224,6 +274,9 @@ public class TerminalApp extends Application {
         }
     }
 
+    /**
+     * Stops the processing of incoming data.
+     */
     public void stopProcessing() {
         isStopped.set(true);
         if (isPaused.get()) {
@@ -231,6 +284,9 @@ public class TerminalApp extends Application {
         }
     }
 
+    /**
+     * Checks for a pause condition and waits if processing is paused.
+     */
     public void checkForPause() {
         synchronized (pauseCondition) {
             while (isPaused.get()) {
@@ -244,53 +300,38 @@ public class TerminalApp extends Application {
         }
     }
 
-    public boolean isStopped() {
-        return isStopped.get();
-    }
-
-    public String getSelectedText() {
-        return "";
-    }
-
-    public void enableLogging() {
-        isLoggingEnabled = true;
-        logger.info("Логирование включено.");
-        setLoggingLevel(Level.DEBUG);
-    }
-
-    public void disableLogging() {
-        isLoggingEnabled = false;
-        logger.info("Логирование отключено.");
-        setLoggingLevel(Level.OFF);
-    }
-
-    private void setLoggingLevel(Level level) {
-        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
-        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(Logger.ROOT_LOGGER_NAME);
-        rootLogger.setLevel(level);
-    }
-
-    public void handleBackspace() {
-        if (cursor.getColumn() > 0) {
-            cursor.moveLeft();
-            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
-        } else if (cursor.getRow() > 0) {
-            cursor.setPosition(cursor.getRow() - 1, screenBuffer.getColumns() - 1);
-            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
-        }
-    }
-
+    /**
+     * Checks if processing has been stopped, and if so, throws an InterruptedException.
+     *
+     * @throws InterruptedException if processing is stopped
+     */
     public void checkForStop() throws InterruptedException {
         if (isStopped.get() || Thread.currentThread().isInterrupted()) {
-            throw new InterruptedException("Обработка остановлена");
+            throw new InterruptedException("Verarbeitung gestoppt");
         }
     }
+
+    /**
+     * Returns the current SSHManager.
+     *
+     * @return the SSHManager instance
+     */
     public SSHManager getSSHManager() {
         return sshManager;
     }
+
+    /**
+     * Returns the file processing service instance.
+     *
+     * @return the FileProcessingService instance
+     */
     public FileProcessingService getFileProcessingService() {
         return fileProcessingService;
     }
+
+    /**
+     * Opens the profile selection dialog.
+     */
     public void openProfileDialog() {
         Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
         chosen.ifPresent(config -> {
@@ -302,8 +343,8 @@ public class TerminalApp extends Application {
     }
 
     /**
-     * Перезапускает текущее соединение, используя сохранённый профиль.
-     * Если профиль не найден, открывает диалог выбора.
+     * Restarts the current SSH connection using the saved profile.
+     * If no profile is found, it opens the profile selection dialog.
      */
     public void restartConnection() {
         if (sshManager != null && sshManager.isConnected()) {
@@ -318,18 +359,80 @@ public class TerminalApp extends Application {
         }
     }
 
+    /**
+     * Disconnects the SSH connection and displays a message to the terminal.
+     */
     public void disconnectConnection() {
         if (sshManager != null && sshManager.isConnected()) {
             sshManager.disconnect();
-            processInput("Подключение было отключено\r".toCharArray());
+            processInput("Die Verbindung wurde abgebrochen\r".toCharArray());
         }
     }
 
+    /**
+     * Returns the thread handling the processing of data.
+     *
+     * @return the processing thread
+     */
     public Thread getProcessingThread() {
         return processingThread;
     }
 
+    /**
+     * Enables logging by setting the log level to DEBUG and printing a German log message.
+     */
+    public void enableLogging() {
+        isLoggingEnabled = true;
+        logger.info("Logging aktiviert.");
+        setLoggingLevel(Level.DEBUG);
+    }
 
+    /**
+     * Disables logging by setting the log level to OFF and printing a German log message.
+     */
+    public void disableLogging() {
+        isLoggingEnabled = false;
+        logger.info("Logging deaktiviert.");
+        setLoggingLevel(Level.OFF);
+    }
+
+    /**
+     * Sets the logging level for the root logger.
+     *
+     * @param level the desired logging level
+     */
+    private void setLoggingLevel(Level level) {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(Logger.ROOT_LOGGER_NAME);
+        rootLogger.setLevel(level);
+    }
+
+    /**
+     * Handles the Backspace key by moving the cursor left and clearing the previous cell.
+     */
+    public void handleBackspace() {
+        if (cursor.getColumn() > 0) {
+            cursor.moveLeft();
+            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
+        } else if (cursor.getRow() > 0) {
+            cursor.setPosition(cursor.getRow() - 1, screenBuffer.getColumns() - 1);
+            screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new org.msv.vt100.core.Cell(" ", textFormater.getCurrentStyle()));
+        }
+    }
+
+    public String getSelectedText() {
+        return "";
+    }
+
+    public boolean isStopped() {
+        return isStopped.get();
+    }
+
+    /**
+     * The main entry point for the application.
+     *
+     * @param args command-line arguments (not used)
+     */
     public static void main(String[] args) {
         launch(args);
     }
