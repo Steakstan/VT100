@@ -417,13 +417,11 @@ public class TerminalApp extends Application {
 
         String logPath = System.getProperty("LOG_PATH", "logs/app.log");
 
-        // Если logPath указывает на директорию, добавляем имя файла по умолчанию
         File logFile = new File(logPath);
         if (logFile.isDirectory()) {
             logPath = new File(logFile, "app.log").getAbsolutePath();
         }
 
-        // Создаем родительский каталог, если он не существует
         File finalLogFile = new File(logPath);
         File parentDir = finalLogFile.getParentFile();
         if (parentDir != null && !parentDir.exists()) {

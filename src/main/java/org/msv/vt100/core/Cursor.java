@@ -14,8 +14,8 @@ public class Cursor {
     private final Condition positionChanged = lock.newCondition();
 
     public Cursor(int maxRows, int maxColumns) {
-        this.row = 0;      // Начальная строка
-        this.column = 0;   // Начальная колонка
+        this.row = 0;
+        this.column = 0;
         this.maxRows = maxRows;
         this.maxColumns = maxColumns;
     }
