@@ -7,6 +7,7 @@ import ch.qos.logback.core.FileAppender;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
+import org.msv.vt100.OrderAutomation.LoginAutomationProcessor;
 import org.msv.vt100.ansiisequences.*;
 import org.msv.vt100.OrderAutomation.ScreenTextDetector;
 import org.msv.vt100.ssh.SSHProfileManager;
@@ -15,6 +16,7 @@ import org.msv.vt100.core.*;
 import org.msv.vt100.ssh.SSHConfig;
 import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.core.FileProcessingService;
+import org.msv.vt100.ui.LoginSettingsDialog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Level;
@@ -118,17 +120,23 @@ public class TerminalApp extends Application {
             sshManager.disconnect();
         }
         try {
-            currentProfile = config; // Save the profile
+            currentProfile = config; // Сохраняем профиль
             sshManager = new SSHManager(config);
             sshManager.addDataListener(data -> Platform.runLater(() -> processInput(data.toCharArray())));
-            sshManager.connectAsync().exceptionally(ex -> {
-                System.err.println("SSH-Verbindungsfehler: " + ex.getMessage());
-                return null;
-            });
+            sshManager.connectAsync()
+                    .thenRun(() -> {
+                        // После успешного подключения запускаем автоматическую авторизацию
+                        new LoginAutomationProcessor(this).startAutoLogin();
+                    })
+                    .exceptionally(ex -> {
+                        System.err.println("SSH-Verbindungsfehler: " + ex.getMessage());
+                        return null;
+                    });
         } catch (Exception e) {
             System.err.println("Fehler bei der Initialisierung von SSHManager: " + e.getMessage());
         }
     }
+
 
     /**
      * Initializes terminal components such as the cursor, screen buffer, text formatter, and various handlers.
@@ -264,9 +272,12 @@ public class TerminalApp extends Application {
 
     /**
      * Pauses the processing of incoming data.
+     *
+     * @return
      */
-    public void pauseProcessing() {
+    public boolean pauseProcessing() {
         isPaused.set(true);
+        return false;
     }
 
     /**
@@ -417,6 +428,7 @@ public class TerminalApp extends Application {
 
         String logPath = System.getProperty("LOG_PATH", "logs/app.log");
 
+
         File logFile = new File(logPath);
         if (logFile.isDirectory()) {
             logPath = new File(logFile, "app.log").getAbsolutePath();
@@ -482,11 +494,28 @@ public class TerminalApp extends Application {
     }
 
     public String getSelectedText() {
-        return "";
+        return uiController.getTerminalCanvas().getSelectedText();
     }
 
     public boolean isStopped() {
         return isStopped.get();
+    }
+
+    public void openPositionssucheDialog() {
+        PositionssucheDialog dialog = new PositionssucheDialog(this);
+        dialog.show();
+    }
+
+    public ScreenBuffer getScreenBuffer() {
+        return screenBuffer;
+    }
+
+    public void openLoginSettingsDialog() {
+        LoginSettingsDialog dialog = new LoginSettingsDialog();
+        dialog.show();
+    }
+    public Cursor getCursor() {
+        return cursor;
     }
 
     /**

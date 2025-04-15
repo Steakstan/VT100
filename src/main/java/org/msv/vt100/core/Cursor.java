@@ -28,7 +28,6 @@ public class Cursor {
         return column;
     }
 
-    // Метод для установки позиции курсора
     public void setPosition(int row, int column) {
         lock.lock();
         try {
@@ -40,15 +39,12 @@ public class Cursor {
         }
     }
 
-    // Перемещаем курсор вправо
     public void moveRight() {
         if (column < maxColumns - 1) {
             column++;
         }
-        // Не переходим на новую строку автоматически
     }
 
-    // Перемещаем курсор влево
     public void moveLeft() {
         if (column > 0) {
             column--;
@@ -62,61 +58,23 @@ public class Cursor {
         this.column = 0;
     }
 
-    String invertColors(String style) {
-        Map<String, String> styleMap = parseStyleString(style);
-
-        String fillColor = styleMap.get("-fx-fill");
-        String backgroundColor = styleMap.get("-rtfx-background-color");
-
-        if (fillColor != null && backgroundColor != null) {
-            // Инвертируем цвета
-            styleMap.put("-fx-fill", backgroundColor);
-            styleMap.put("-rtfx-background-color", fillColor);
-        } else {
-            // Если цвета не заданы, устанавливаем контрастные значения
-            styleMap.put("-fx-fill", "black");
-            styleMap.put("-rtfx-background-color", "white");
-        }
-
-        return buildStyleString(styleMap);
-    }
-
-    private Map<String, String> parseStyleString(String style) {
-        Map<String, String> styleMap = new HashMap<>();
-        String[] styles = style.split(";");
-        for (String s : styles) {
-            String[] keyValue = s.trim().split(":", 2);
-            if (keyValue.length == 2) {
-                styleMap.put(keyValue[0].trim(), keyValue[1].trim());
-            }
-        }
-        return styleMap;
-    }
-
-    private String buildStyleString(Map<String, String> styleMap) {
-        StringBuilder styleBuilder = new StringBuilder();
-        for (Map.Entry<String, String> entry : styleMap.entrySet()) {
-            styleBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("; ");
-        }
-        return styleBuilder.toString().trim();
-    }
-    public String getCursorPosition() {
+    public String getCursorPositionString() {
         lock.lock();
         try {
-            return String.valueOf(row + 1) + (column + 1);
+            return (row + 1) + "," + (column + 1);
         } finally {
             lock.unlock();
         }
     }
+
     public void waitForPosition(String desiredPosition) throws InterruptedException {
         lock.lock();
         try {
-            while (!getCursorPosition().equals(desiredPosition)) {
+            while (!getCursorPositionString().equals(desiredPosition)) {
                 positionChanged.await();
             }
         } finally {
             lock.unlock();
         }
     }
-
 }

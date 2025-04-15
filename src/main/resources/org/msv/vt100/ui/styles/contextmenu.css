@@ -1,0 +1,16 @@
+.context-menu {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.context-menu > .menu-content {
+    -fx-background-color: transparent;
+}
+
+.copy-button-label {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-alignment: center;
+    -fx-background-color: transparent;
+}

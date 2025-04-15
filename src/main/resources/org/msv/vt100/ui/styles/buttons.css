@@ -1,0 +1,58 @@
+.button {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-pref-height: 30;
+}
+
+.dialog-button {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-padding: 5 10 5 10;
+    -fx-text-fill: white;
+}
+
+.dialog-button:hover {
+    -fx-background-color: white;
+    -fx-text-fill: rgb(28, 151, 181);
+
+}
+
+.top-bar-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-pref-width: 30;
+    -fx-pref-height: 30;
+    -fx-cursor: hand;
+    -fx-background-radius: 10;
+}
+
+.top-bar-button:hover {
+    -fx-background-color: #586e75;
+}
+
+.top-bar-button.close:hover {
+    -fx-background-color: red;
+}
+
+.dialog-header-close-button {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-background-radius: 5;
+}
+
+.dialog-header-close-button:hover {
+    -fx-background-color: red;
+}
+
+.copy-button-container {
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-padding: 6 10 6 10;
+    -fx-background-radius: 15;
+    -fx-border-radius: 15;
+}
+
+.copy-button-container:hover {
+    -fx-background-color: white;
+    -fx-border-color: white;
+}

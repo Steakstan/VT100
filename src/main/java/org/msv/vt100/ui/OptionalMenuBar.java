@@ -1,14 +1,25 @@
 package org.msv.vt100.ui;
 
+import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.input.MouseEvent;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.msv.vt100.TerminalApp;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class OptionalMenuBar extends HBox {
 
@@ -18,150 +29,150 @@ public class OptionalMenuBar extends HBox {
 
     public OptionalMenuBar(Stage primaryStage, TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
+
         setSpacing(1);
+        setAlignment(Pos.CENTER_LEFT);
         getStyleClass().add("custom-tab-header");
 
-
-        setAlignment(Pos.CENTER_LEFT);
-
-        // Создаем кнопки меню
         Button btnDatei = createMenuButton("Datei");
         Button btnBearbeiten = createMenuButton("Bearbeiten");
         Button btnLog = createMenuButton("Log");
 
-        // Устанавливаем обработчики кликов
         btnDatei.setOnAction(e -> togglePopup(btnDatei, primaryStage));
         btnBearbeiten.setOnAction(e -> togglePopup(btnBearbeiten, primaryStage));
         btnLog.setOnAction(e -> togglePopup(btnLog, primaryStage));
 
-        // При наведении переключаем popup, если курсор переходит на другую кнопку
-        btnDatei.setOnMouseEntered(e -> {
-            if (currentPopup != null && currentPopupButton != btnDatei) {
-                togglePopup(btnDatei, primaryStage);
-            }
-        });
-        btnBearbeiten.setOnMouseEntered(e -> {
-            if (currentPopup != null && currentPopupButton != btnBearbeiten) {
-                togglePopup(btnBearbeiten, primaryStage);
-            }
-        });
-        btnLog.setOnMouseEntered(e -> {
-            if (currentPopup != null && currentPopupButton != btnLog) {
-                togglePopup(btnLog, primaryStage);
-            }
-        });
+        setupHoverToggle(btnDatei, primaryStage);
+        setupHoverToggle(btnBearbeiten, primaryStage);
+        setupHoverToggle(btnLog, primaryStage);
 
         getChildren().addAll(btnDatei, btnBearbeiten, btnLog);
     }
 
-    /**
-     * Создает кнопку меню с базовой стилизацией.
-     */
     private Button createMenuButton(String text) {
         Button button = new Button(text);
-        button.getStyleClass().add("menu-button");
+        button.getStyleClass().setAll("menu-button");
+        HBox.setHgrow(button, Priority.NEVER);
         return button;
     }
 
-    /**
-     * Переключает popup-окно для заданной кнопки.
-     */
-    private void togglePopup(Button button, Stage primaryStage) {
-        if (currentPopup != null && currentPopupButton == button) {
-            currentPopup.hide();
-            currentPopup = null;
-            currentPopupButton = null;
-        } else {
-            if (currentPopup != null) {
-                currentPopup.hide();
-                currentPopup = null;
-                currentPopupButton = null;
+    private void setupHoverToggle(Button button, Stage stage) {
+        button.setOnMouseEntered(e -> {
+            if (currentPopup != null && currentPopupButton != button) {
+                togglePopup(button, stage);
             }
-            Popup newPopup = createPopupForButton(button, primaryStage);
-            newPopup.setAutoHide(true);
-            // Вычисляем позицию popup ниже кнопки
+        });
+    }
+
+    private void togglePopup(Button button, Stage stage) {
+        if (currentPopup != null && currentPopupButton == button) {
+            closePopup();
+        } else {
+            closePopup();
+
+            switch (button.getText()) {
+                case "Datei" -> currentPopup = createPopupMenu(
+                        new MenuEntry[]{
+                                new MenuEntry("⚙ Verbindung Einstellungen", () -> terminalApp.openProfileDialog()),
+                                new MenuEntry("🔄 Verbindung neu starten", () -> terminalApp.restartConnection()),
+                                new MenuEntry("🔐 Login‑Einstellungen", () -> terminalApp.openLoginSettingsDialog()),
+                                MenuEntry.separator(),
+                                new MenuEntry("⛔ Verbindung abfallen", () -> terminalApp.disconnectConnection())
+                        });
+
+                case "Bearbeiten" -> currentPopup = createPopupMenu(
+                        new MenuEntry[]{
+                                new MenuEntry("📝 Bearbeitungseinstellungen", () -> terminalApp.openBearbeitungseinstellungenDialog()),
+                                new MenuEntry("🔍 Positionssuche", () -> terminalApp.openPositionssucheDialog())
+                        });
+
+                case "Log" -> currentPopup = createPopupMenu(
+                        new MenuEntry[]{
+                                new MenuEntry("📄 Log Einstellungen", () -> new LogSettingsDialog(terminalApp).show())
+                        });
+
+                default -> currentPopup = createPopupMenu(
+                        new MenuEntry[]{new MenuEntry("❓ Nicht realisiert", () -> {})}
+                );
+            }
+
+            currentPopup.setAutoHide(true);
+
             double x = button.localToScreen(button.getBoundsInLocal()).getMinX();
             double y = button.localToScreen(button.getBoundsInLocal()).getMaxY();
-            newPopup.show(button, x, y);
-            currentPopup = newPopup;
+            currentPopup.show(button, x, y);
             currentPopupButton = button;
         }
     }
 
-    /**
-     * Создает popup-окно для кнопки по её тексту.
-     */
-    private Popup createPopupForButton(Button button, Stage primaryStage) {
-        String text = button.getText();
-        Popup popup = new Popup();
-        VBox content = createPopupContent();
-
-        switch (text) {
-            case "Datei":
-                content.getChildren().addAll(
-                        createActionButton("Verbindung Einstellungen", () -> {
-                            terminalApp.openProfileDialog();
-                            popup.hide();
-                        }),
-                        createActionButton("Verbindung neu starten", () -> {
-                            terminalApp.restartConnection();
-                            popup.hide();
-                        }),
-                        createActionButton("Verbindung abfallen", () -> {
-                            terminalApp.disconnectConnection();
-                            popup.hide();
-                        })
-                );
-                break;
-            case "Bearbeiten":
-                content.getChildren().add(
-                        createActionButton("Bearbeitungseinstellungen", () -> {
-                            terminalApp.openBearbeitungseinstellungenDialog();
-                            popup.hide();
-                        })
-                );
-                break;
-            case "Log":
-                content.getChildren().add(
-                        createActionButton("Log Einstellungen", () -> {
-                            new LogSettingsDialog(terminalApp).show();
-                            popup.hide();
-                        })
-                );
-                break;
-            default:
-                content.getChildren().add(
-                        createActionButton("Nicht realisiert", popup::hide)
-                );
+    private void closePopup() {
+        if (currentPopup != null) {
+            currentPopup.hide();
+            currentPopup = null;
+            currentPopupButton = null;
         }
+    }
+
+    private Popup createPopupMenu(MenuEntry[] entries) {
+        Popup popup = new Popup();
+        VBox content = new VBox(5);
+        content.getStyleClass().add("popup-container");
+
+        List<Button> buttons = new ArrayList<>();
+
+        for (MenuEntry entry : entries) {
+            if (entry.isSeparator()) {
+                Separator separator = new Separator();
+                separator.setOpacity(0.3);
+                content.getChildren().add(separator);
+                continue;
+            }
+
+            Button btn = new Button(entry.label());
+            btn.getStyleClass().add("menu-item");
+            btn.setOnAction(e -> {
+                entry.action().run();
+                popup.hide();
+            });
+            buttons.add(btn);
+            content.getChildren().add(btn);
+        }
+
+        for (Button b : buttons) {
+            b.applyCss();
+            b.layout();
+        }
+
+        double maxWidth = buttons.stream()
+                .mapToDouble(this::computeTextWidth)
+                .max()
+                .orElse(0) + 50;
+
+        for (Button b : buttons) {
+            b.setPrefWidth(maxWidth);
+        }
+
+        // 👇 Анимация появления popup
+        content.setOpacity(0);
+        FadeTransition ft = new FadeTransition(Duration.millis(120), content);
+        ft.setToValue(1.0);
+        ft.play();
+
         popup.getContent().add(content);
         return popup;
     }
 
-    /**
-     * Создает VBox-контейнер для содержимого popup с единым стилем,
-     * используя стиль из CSS (класс "popup-container").
-     */
-    private VBox createPopupContent() {
-        VBox content = new VBox(5);
-        content.getStyleClass().add("popup-container");
-        return content;
-    }
+    private double computeTextWidth(Button button) {
+        Text text = new Text(button.getText());
+        text.setFont(button.getFont());
 
-    /**
-     * Создает кнопку для popup-а с заданным текстом и действием.
-     */
-    private Button createActionButton(String text, Runnable action) {
-        Button button = new Button(text);
-        styleMenuButton(button);
-        button.setOnAction(e -> action.run());
-        return button;
-    }
+        double dpiScale = button.getScene() != null
+                ? button.getScene().getWindow().getRenderScaleX()
+                : 1.0;
 
-    /**
-     * Применяет стили к кнопке popup-а.
-     */
-    private void styleMenuButton(Button button) {
-        button.getStyleClass().add("menu-item");
+        Insets padding = button.getPadding();
+        double paddingSum = (padding != null) ? padding.getLeft() + padding.getRight() : 0;
+
+        return text.getLayoutBounds().getWidth() * dpiScale + paddingSum;
     }
 }

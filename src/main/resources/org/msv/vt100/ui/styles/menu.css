@@ -1,0 +1,36 @@
+.menu-button {
+    -fx-background-color: rgb(0,43,54);
+    -fx-text-fill: turquoise;
+    -fx-font-size: 14px;
+    -fx-padding: 3 10; /* меньший padding */
+    -fx-background-radius: 4;
+    ;
+
+    -fx-pref-height: 24;
+    -fx-min-height: 24;
+
+
+
+}
+
+
+.menu-button:hover {
+    -fx-background-color: rgba(100, 255, 255, 0.1);
+    -fx-effect: innershadow(gaussian, turquoise, 5, 0.0, 0, 0);
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-padding: 4 12;
+    -fx-alignment: CENTER_LEFT;
+    -fx-background-radius: 4;
+    -fx-font-family: "Segoe UI Symbol", "Arial Unicode MS"; /* для emoji */
+}
+
+.menu-item:hover {
+    -fx-background-color: rgb(0,43,54, 0.8);
+    -fx-effect: innershadow(gaussian, turquoise, 5, 0.0, 0, 0);
+
+}

@@ -1,0 +1,17 @@
+.profile-list-container {
+    -fx-background-color: rgba(2,23,28,0.9);
+    -fx-background-radius: 15;
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-border-radius: 15;
+    -fx-padding: 10;
+}
+
+.profile-list-container .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+}
+
+.profile-list-container .list-cell:hover {
+    -fx-background-color: #586e75;
+}

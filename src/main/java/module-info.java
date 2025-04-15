@@ -20,4 +20,5 @@ module org.msv.vt100 {
     opens org.msv.vt100.ansiisequences to javafx.fxml;
     exports org.msv.vt100.core;
     opens org.msv.vt100.core to javafx.fxml;
+    opens org.msv.vt100.login to com.google.gson;
 }

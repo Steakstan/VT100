@@ -10,11 +10,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 
-/**
- * OrderConfirmation handles the processing and confirmation of orders.
- * It reads order data from an Excel sheet, sends appropriate commands via SSH,
- * and adjusts the terminal cursor according to the screen content.
- */
 public class OrderConfirmation {
 
     private final SSHManager sshConnector;
@@ -22,234 +17,330 @@ public class OrderConfirmation {
     private final TerminalApp terminalApp;
     private final ScreenTextDetector screenTextDetector;
 
-    /**
-     * Constructs an OrderConfirmation instance.
-     *
-     * @param sshConnector       the SSHManager for sending commands.
-     * @param cursor             the terminal cursor.
-     * @param terminalApp        the main TerminalApp.
-     * @param screenTextDetector the detector to verify screen content.
-     */
     public OrderConfirmation(SSHManager sshConnector, Cursor cursor, TerminalApp terminalApp, ScreenTextDetector screenTextDetector) {
+        System.out.println("Konstruktor OrderConfirmation aufgerufen: Initialisierung der benötigten Objekte.");
         this.sshConnector = sshConnector;
         this.cursor = cursor;
         this.terminalApp = terminalApp;
         this.screenTextDetector = screenTextDetector;
+        System.out.println("Konstruktor abgeschlossen: Alle Objekte initialisiert.");
     }
 
-    /**
-     * Processes orders from the given row iterator.
-     *
-     * @param rows an Iterator of Excel rows.
-     * @throws IOException          if an I/O error occurs.
-     * @throws InterruptedException if processing is interrupted.
-     */
     public void processOrders(Iterator<Row> rows) throws IOException, InterruptedException {
+        System.out.println("Starte Verarbeitung aller Bestellungen aus dem Iterator.");
         while (rows.hasNext()) {
             if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
-                System.out.println("Verarbeitung gestoppt.");
+                System.out.println("Verarbeitung gestoppt: Programm wurde abgebrochen oder Thread unterbrochen.");
                 break;
             }
-
             terminalApp.checkForPause();
-
             Row currentRow = rows.next();
+            System.out.println("Nächste Zeile im Excel-Sheet gelesen, beginne mit der Verarbeitung dieser Bestellung.");
             try {
                 processOrder(currentRow);
             } catch (InterruptedException e) {
-                System.out.println("Verarbeitung unterbrochen.");
-                throw e; // Rethrow the exception
+                System.out.println("Verarbeitung unterbrochen: Exception wurde ausgelöst, breche ab.");
+                throw e;
             }
         }
+        System.out.println("Verarbeitung aller Bestellungen abgeschlossen oder gestoppt.");
     }
 
-    /**
-     * Processes a single order.
-     *
-     * @param row the Excel row containing order data.
-     * @throws IOException          if an I/O error occurs.
-     * @throws InterruptedException if processing is interrupted.
-     */
     public void processOrder(Row row) throws IOException, InterruptedException {
-        String orderNumber = FileExtractor.extractCellValueAsString(row.getCell(0));
-        String positionNumber = FileExtractor.extractCellValueAsString(row.getCell(1));
-        String deliveryDate = FileExtractor.extractCellValueAsString(row.getCell(3));
-        String confirmationNumber = FileExtractor.extractCellValueAsString(row.getCell(2));
+        final String STARTUP_CURSOR = "3,11";
+        String orderNumber = FileExtractor.extractCellValueAsString(row.getCell(0)).trim();
+        String positionNumber = FileExtractor.extractCellValueAsString(row.getCell(1)).trim();
+        String confirmationNumber = FileExtractor.extractCellValueAsString(row.getCell(2)).trim();
+        String deliveryDate = FileExtractor.extractCellValueAsString(row.getCell(3)).trim();
+        String screenText;
+        String cursorPosition;
 
-        System.out.println("Verarbeitung der Bestellung: " + orderNumber);
+        System.out.println("Начало обработки заказа. Номер заказа: " + orderNumber);
 
-        String cursorPosition = getCursorPosition();
-
-        if (screenTextDetector.isAufNrDisplayed()) {
-            if (orderNumber.length() == 5) {
-                System.out.println("Auf dem Bildschirm 'Auf-Nr.:' und die Bestellnummer besteht aus 5 Ziffern. Sende 'L' an den Server.");
-                sendDataWithDelay("L");
-                sendDataWithDelay("\r");
-            } else if (orderNumber.length() != 6) {
-                System.out.println("Fehler: Die Bestellnummer muss 5 oder 6 Zeichen enthalten. Verarbeitung gestoppt.");
+        while (true) {
+            if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                System.out.println("Обработка остановлена. Завершаю выполнение.");
                 return;
             }
-        } else if (screenTextDetector.isLbNrDisplayed()) {
-            if (orderNumber.length() == 6) {
-                System.out.println("Auf dem Bildschirm 'LB-Nr.:' und die Bestellnummer besteht aus 6 Ziffern. Sende 'K' an den Server.");
-                sendDataWithDelay("K");
-                sendDataWithDelay("\r");
-            } else if (orderNumber.length() != 5) {
-                System.out.println("Fehler: Die Bestellnummer muss 5 oder 6 Zeichen enthalten. Verarbeitung gestoppt.");
-                return;
-            }
-        } else {
-            System.out.println("Es konnte nicht festgestellt werden, was auf dem Bildschirm angezeigt wird. Verarbeitung gestoppt.");
-            return;
-        }
-
-        while (!cursorPosition.equals("311")) {
-            System.out.println("Die Cursorposition ist nicht '311'. Bewege den Cursor nach links und überprüfe erneut.");
-            sendDataWithDelay("\u001BOQ");
-
-            System.out.println("Aktuelle Position: " + cursorPosition);
-
-            if (cursorPosition.equals("2362")) {
-                System.out.println("Der Cursor befindet sich immer noch in Position '2362'. Eingabe des Buchstabens 'L' und des Wertes '5.0321'.");
-                sendDataWithDelay("L");
-                sendDataWithDelay("\r");
-                sendDataWithDelay("5.0321");
-                sendDataWithDelay("\r");
-
-                System.out.println("Erneute Verarbeitung der aktuellen Bestellung: " + orderNumber);
-                processOrder(row);
-                return;
-            }
-
+            terminalApp.checkForPause();
             cursorPosition = getCursorPosition();
+            try {
+                java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                screenText = (String) method.invoke(screenTextDetector);
+            } catch (Exception e) {
+                screenText = screenTextDetector.toString();
+            }
+            System.out.println("Проверка стартовой страницы: позиция курсора = " + cursorPosition);
+            if (cursorPosition.equals("3,24") && screenText.contains("Programm - Nr.:")) {
+                System.out.println("Найден 'Programm - Nr.:' на 3,24. Отправляю '5.0321'.");
+                sendDataWithDelay("5.0321\r");
+                Thread.sleep(100);
+            } else if (cursorPosition.equals(STARTUP_CURSOR) && (screenText.contains("Auf-Nr.:") || screenText.contains("LB-Nr.:"))) {
+                System.out.println("Стартовая страница достигнута. Позиция курсора: " + STARTUP_CURSOR);
+                break;
+            } else {
+                System.out.println("Стартовая страница не обнаружена. Переключаю экран.");
+                sendDataWithDelay("\u001BOS");
+                sendDataWithDelay("\u001BOQ");
+            }
         }
 
-        if (screenTextDetector.isWareneingangDisplayed()) {
-            sendDataWithDelay("\u001BOQ");
+        try {
+            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+            screenText = (String) method.invoke(screenTextDetector);
+        } catch (Exception e) {
+            screenText = screenTextDetector.toString();
+        }
+
+        boolean isSpecialSix = false;
+        if (orderNumber.length() == 5 && screenText.contains("Auf-Nr.:")) {
+            System.out.println("Номер заказа из 5 символов. Отправляю 'L'.");
+            sendDataWithDelay("L");
+            sendDataWithDelay("\r");
+            isSpecialSix = true;
+        } else if (orderNumber.length() == 6 && screenText.contains("LB-Nr.:")) {
+            System.out.println("Номер заказа из 6 символов. Отправляю 'K'.");
+            sendDataWithDelay("K");
+            sendDataWithDelay("\r");
+            isSpecialSix = true;
+        } else if (orderNumber.length() == 6 && screenText.contains("Auf-Nr.:")) {
+            System.out.println("Номер заказа из 6 символов с 'Auf-Nr.:' обнаружен. Специальный режим.");
+            isSpecialSix = true;
+        } else {
+            System.out.println("Условия для номера заказа не выполнены. Прерываю обработку.");
             return;
         }
 
-        System.out.println("Der Cursor befindet sich an der richtigen Position. Bestellnummer eingeben: " + orderNumber);
+        System.out.println("Отправляю номер заказа: " + orderNumber);
         sendDataWithDelay(orderNumber);
         sendDataWithDelay("\r");
 
-        System.out.println("Positionsnummer eingeben: " + positionNumber);
-        sendDataWithDelay(positionNumber);
-        sendDataWithDelay("\r");
-
-        System.out.println("Überprüfung, ob die Bestellung nicht bereits geliefert wurde.");
-
-        cursorPosition = getCursorPosition();
-        if (cursorPosition.equals("1374")) {
-            System.out.println("Der Cursor hat den Wert '1374'. Pfeiltaste zurück drücken und zur nächsten Bestellung wechseln.");
-            sendDataWithDelay("\u001BOQ");
-            return;
-        }
-
-        System.out.println("Überprüfung der Cursorposition vor der Eingabe des Lieferdatums.");
-
-        cursorPosition = getCursorPosition();
-
-        while (cursorPosition.equals("2480") || cursorPosition.equals("2443")) {
-            System.out.println("Die Cursorposition ist '" + cursorPosition + "'. Drücke Enter und überprüfe erneut.");
-            sendDataWithDelay("\r");
-            cursorPosition = getCursorPosition();
-        }
-
-        if (cursorPosition.equals("936")) {
-            System.out.println("Der Cursor befindet sich an der richtigen Position. Lieferdatum eingeben: " + deliveryDate);
-            sendDataWithDelay(deliveryDate);
-            sendDataWithDelay("\r");
-            sendDataWithDelay("\r");
-            Thread.sleep(1500);
-        } else {
-            System.out.println("Der Cursor befindet sich nicht an der richtigen Position für die Datumseingabe.");
-            cursorPosition = getCursorPosition();
-            sendDataWithDelay(deliveryDate);
-            sendDataWithDelay("\r");
-            sendDataWithDelay("\r");
-            Thread.sleep(1500);
-        }
-
-        System.out.println("Eingabe der Bestätigungsnummer: " + confirmationNumber);
-        sendDataWithDelay(confirmationNumber);
-
-        while (!cursorPosition.equals("2375") && !cursorPosition.equals("2376") && !cursorPosition.equals("2377")) {
-            sendDataWithDelay("\r");
-            cursorPosition = getCursorPosition();
-
-            switch (cursorPosition) {
-                case "311", "411" -> {
-                    System.out.println("Der Cursor hat den Wert " + cursorPosition + ". Schleife wird abgebrochen und zur nächsten Bestellung gewechselt.");
+        if (isSpecialSix) {
+            System.out.println("Ожидание экрана ввода номера позиции (позиция 4,11 с 'Pos.   :').");
+            while (true) {
+                if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                    System.out.println("Остановка во время ожидания ввода номера позиции.");
                     return;
                 }
-                case "221" -> {
-                    System.out.println("Der Cursor hat den Wert '221'.");
-                    sendDataWithDelay("\u001BOQ");
+                terminalApp.checkForPause();
+                String currentCursor = getCursorPosition();
+                try {
+                    java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                    screenText = (String) method.invoke(screenTextDetector);
+                } catch (Exception e) {
+                    screenText = screenTextDetector.toString();
+                }
+                System.out.println("Ожидание ввода позиции: текущая позиция = " + currentCursor);
+                if (currentCursor.equals("4,11") && screenText.contains("Pos.   :")) {
+                    System.out.println("Экран ввода позиции обнаружен.");
+                    break;
+                }
+                Thread.sleep(100);
+            }
+            System.out.println("Отправляю номер позиции: " + positionNumber);
+            sendDataWithDelay(positionNumber);
+            sendDataWithDelay("\r");
+
+            while (true) {
+                if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                    System.out.println("Остановка после отправки номера позиции.");
+                    return;
+                }
+                terminalApp.checkForPause();
+                String currentCursor = getCursorPosition();
+                try {
+                    java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                    screenText = (String) method.invoke(screenTextDetector);
+                } catch (Exception e) {
+                    screenText = screenTextDetector.toString();
+                }
+                System.out.println("Проверка после ввода позиции: текущая позиция = " + currentCursor);
+                if (screenText.contains("Keine Bestellware!")) {
+                    System.out.println("Обнаружена 'Keine Bestellware!'. Возвращаюсь на стартовую страницу.");
+                    while (true) {
+                        if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                            System.out.println("Остановка при возврате на стартовую страницу.");
+                            return;
+                        }
+                        terminalApp.checkForPause();
+                        cursorPosition = getCursorPosition();
+                        try {
+                            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                            screenText = (String) method.invoke(screenTextDetector);
+                        } catch (Exception e) {
+                            screenText = screenTextDetector.toString();
+                        }
+                        System.out.println("Возврат на стартовую страницу: текущая позиция = " + cursorPosition);
+                        if (cursorPosition.equals(STARTUP_CURSOR) && (screenText.contains("Auf-Nr.:") || screenText.contains("LB-Nr.:"))) {
+                            System.out.println("Стартовая страница достигнута. Переход к следующему заказу.");
+                            break;
+                        }
+                        sendDataWithDelay("\u001BOQ");
+                        Thread.sleep(100);
+                    }
+                    return;
+                } else if (currentCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale")) {
+                    System.out.println("Достигнут экран для ввода даты поставки. Отправляю дату поставки: " + deliveryDate);
+                    sendDataWithDelay(deliveryDate);
+                    sendDataWithDelay("\r");
+                    Thread.sleep(100);
+
+                    /*String alertCursor;
+                    String alertScreenText;
+                    int counter = 0;
+                    boolean alertDetected = false;
+                    while (counter < 10) {  // максимум 10 итераций (~1 секунда ожидания)
+                        if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                            System.out.println("Остановка во время ожидания специального сообщения.");
+                            return;
+                        }
+                        alertCursor = getCursorPosition();
+                        try {
+                            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                            alertScreenText = (String) method.invoke(screenTextDetector);
+                        } catch (Exception e) {
+                            alertScreenText = screenTextDetector.toString();
+                        }
+                        if (alertCursor.equals("23,48") && alertScreenText.contains("AB-Termin liegt vor Tagesdatum")) {
+                            alertDetected = true;
+                            break;
+                        }
+                        Thread.sleep(100);
+                        counter++;
+                    }
+                    if (alertDetected) {
+                        System.out.println("Обнаружено сообщение 'AB-Termin liegt vor Tagesdatum' на позиции 23,48. Отправляю 'J'.");
+                        sendDataWithDelay("J");
+                        sendDataWithDelay("\r");
+                    }*/
+
+
+                    sendDataWithDelay("\r");
+                    System.out.println("Дата поставки отправлена. Переход к ожиданию ввода номера подтверждения.");
+                    while (true) {
+                        if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                            System.out.println("Остановка во время ожидания ввода номера подтверждения.");
+                            return;
+                        }
+                        terminalApp.checkForPause();
+                        String cur = getCursorPosition();
+                        try {
+                            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                            screenText = (String) method.invoke(screenTextDetector);
+                        } catch (Exception e) {
+                            screenText = screenTextDetector.toString();
+                        }
+                        System.out.println("Ожидание ввода номера подтверждения: текущая позиция = " + cur);
+                        if (cur.equals("14,31") && screenText.contains("Erfassen AB-Nummer")) {
+                            System.out.println("Условия для ввода номера подтверждения выполнены.");
+                            break;
+                        }
+                        Thread.sleep(100);
+                    }
+                    System.out.println("Отправляю номер подтверждения: " + confirmationNumber);
+                    sendDataWithDelay(confirmationNumber);
+                    sendDataWithDelay("\r");
+                    while (true) {
+                        if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                            System.out.println("Остановка во время ожидания возврата на стартовую страницу.");
+                            return;
+                        }
+                        terminalApp.checkForPause();
+                        String cur = getCursorPosition();
+                        try {
+                            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                            screenText = (String) method.invoke(screenTextDetector);
+                        } catch (Exception e) {
+                            screenText = screenTextDetector.toString();
+                        }
+                        System.out.println("Ожидание возврата на стартовую страницу: текущая позиция = " + cur);
+
+                        // Новая проверка: если курсор на 4,11 и на экране присутствует слово "Pos."
+                        if (cur.equals("4,11") && screenText.contains("Pos.")) {
+                            System.out.println("Курсор на 4,11 с 'Pos.' обнаружен. Пропущены условия стартовой страницы. Отправляю \"\\u001BOQ\" для возврата на шаг назад.");
+                            sendDataWithDelay("\u001BOQ");
+                            Thread.sleep(100);  // задержка для обновления экрана
+                            continue; // переходим к следующей итерации цикла для повторной проверки
+                        }
+
+                        if (cur.equals(STARTUP_CURSOR) && (screenText.contains("Auf-Nr.:") || screenText.contains("LB-Nr.:"))) {
+                            System.out.println("Стартовая страница достигнута. Переход к следующему заказу.");
+                            break;
+                        }
+                        sendDataWithDelay("\r");
+                        Thread.sleep(100);
+                    }
+                    return;
+                } else if (screenText.contains("Bitte ausloesen !") && !(currentCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale"))) {
+                    System.out.println("Обнаружена 'Bitte ausloesen !', но условия для ввода даты поставки не выполнены. Нажимаю Enter.");
+                    sendDataWithDelay("\r");
+                } else if (screenText.contains("OK (J/N/L/T/G)") && currentCursor.equals("13,74")) {
+                    System.out.println("Обнаружена 'OK (J/N/L/T/G)' на позиции 13,74. Возвращаюсь на стартовую страницу.");
+                    while (true) {
+                        if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                            System.out.println("Остановка при возврате на стартовую страницу.");
+                            return;
+                        }
+                        terminalApp.checkForPause();
+                        cursorPosition = getCursorPosition();
+                        try {
+                            java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
+                            screenText = (String) method.invoke(screenTextDetector);
+                        } catch (Exception e) {
+                            screenText = screenTextDetector.toString();
+                        }
+                        System.out.println("Возврат на стартовую страницу: текущая позиция = " + cursorPosition);
+                        if (cursorPosition.equals(STARTUP_CURSOR) && (screenText.contains("Auf-Nr.:") || screenText.contains("LB-Nr.:"))) {
+                            System.out.println("Стартовая страница достигнута. Переход к следующему заказу.");
+                            break;
+                        }
+                        sendDataWithDelay("\u001BOQ");
+                        Thread.sleep(100);
+                    }
+                    return;
+                } else {
+                    Thread.sleep(100);
                 }
             }
         }
-
-        sendDataWithDelay("\r");
-        cursorPosition = getCursorPosition();
-
-        if (cursorPosition.equals("2440")) {
-            System.out.println("Der Cursor hat den Wert '2440'. Drücke die Pfeiltaste nach links.");
-            sendDataWithDelay("\r");
-        }
-
-        if (cursorPosition.equals("2362")) {
-            System.out.println("Der Cursor hat den Wert '2362'. Drücke die Pfeiltaste nach links.");
-            sendDataWithDelay("\u001BOQ");
-        }
-
-        System.out.println("Verzögerung vor der Verarbeitung der nächsten Bestellung.");
-        if (terminalApp.isStopped()) {
-            System.out.println("Verarbeitung gestoppt.");
-            return;
-        }
-        terminalApp.checkForPause();
     }
 
-    /**
-     * Retrieves the current cursor position as a concatenated string of row and column.
-     *
-     * @return the cursor position string.
-     * @throws InterruptedException if interrupted while waiting.
-     */
+
+
+
+
+
+
+
+
+
     private String getCursorPosition() throws InterruptedException {
+        System.out.println("Fordere Cursorposition vom JavaFX-Thread an.");
         final String[] cursorPosition = new String[1];
         CountDownLatch latch = new CountDownLatch(1);
-
         Platform.runLater(() -> {
-            cursorPosition[0] = String.valueOf(cursor.getRow() + 1) + (cursor.getColumn() + 1);
+            cursorPosition[0] = (cursor.getRow() + 1) + "," + (cursor.getColumn() + 1);
             latch.countDown();
         });
-
         latch.await();
+        System.out.println("Empfangene Cursorposition: " + cursorPosition[0]);
         return cursorPosition[0];
     }
 
-
-
-    /**
-     * Helper method to send data with a delay.
-     *
-     * @param data the data string to send.
-     * @throws IOException          if an I/O error occurs.
-     * @throws InterruptedException if interrupted during delay.
-     */
     private void sendDataWithDelay(String data) throws IOException, InterruptedException {
+        System.out.println("Sende Daten an SSH: '" + data + "' mit Verzögerung.");
         sshConnector.send(data);
-        int sleepTime = 300; // Delay in milliseconds
-        int interval = 50;   // Check every 50 milliseconds
+        int sleepTime = 100;
+        int interval = 50;
         int elapsed = 0;
         while (elapsed < sleepTime) {
             if (terminalApp.isStopped() || Thread.currentThread().isInterrupted()) {
+                System.out.println("Unterbrechung oder Stop erkannt. Werfe InterruptedException.");
                 throw new InterruptedException("Verarbeitung gestoppt");
             }
             Thread.sleep(interval);
             elapsed += interval;
         }
+        System.out.println("Verzögerung abgeschlossen, kehre zurück zum Hauptablauf.");
     }
 }
