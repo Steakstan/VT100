@@ -15,7 +15,6 @@ import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
 
 import java.io.File;
-import java.util.Objects;
 
 public class BearbeitungseinstellungenDialog {
 
@@ -23,6 +22,8 @@ public class BearbeitungseinstellungenDialog {
     private final TerminalApp terminalApp;
     private ComboBox<String> operationComboBox;
     private TextField filePathField;
+    private CheckBox commentCheckBox;
+    private TextField commentField;
 
     public BearbeitungseinstellungenDialog(TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
@@ -90,6 +91,20 @@ public class BearbeitungseinstellungenDialog {
         HBox fileBox = new HBox(5, filePathField, browseButton);
         fileBox.setAlignment(Pos.CENTER_LEFT);
 
+        // Kommentar aktivieren
+        commentCheckBox = new CheckBox("Kommentar schreiben");
+        commentCheckBox.setSelected(true);
+
+        Label commentLabel = new Label("Kommentartext:");
+        commentLabel.getStyleClass().add("dialog-label-turquoise");
+
+        commentField = new TextField("DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT");
+        commentField.getStyleClass().add("dialog-text-field");
+
+        VBox commentBox = new VBox(5, commentCheckBox, commentLabel, commentField);
+        commentBox.setAlignment(Pos.CENTER_LEFT);
+
+        // Buttons
         Button startButton = new Button("Verarbeitung starten");
         startButton.getStyleClass().add("dialog-button");
         startButton.setOnAction(e -> startProcessing());
@@ -106,7 +121,8 @@ public class BearbeitungseinstellungenDialog {
         grid.add(operationComboBox, 1, 0);
         grid.add(fileLabel, 0, 1);
         grid.add(fileBox, 1, 1);
-        grid.add(buttonBox, 1, 2);
+        grid.add(commentBox, 1, 2);
+        grid.add(buttonBox, 1, 3);
 
         // Корневой контейнер
         BorderPane root = new BorderPane();
@@ -114,12 +130,12 @@ public class BearbeitungseinstellungenDialog {
         root.setTop(header);
         root.setCenter(grid);
 
-        Rectangle clip = new Rectangle(500, 200);
+        Rectangle clip = new Rectangle(500, 260);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
         root.setClip(clip);
 
-        Scene scene = new Scene(root, 500, 200);
+        Scene scene = new Scene(root, 500, 260);
         scene.setFill(Color.TRANSPARENT);
 
         scene.getStylesheets().addAll(
@@ -139,15 +155,20 @@ public class BearbeitungseinstellungenDialog {
         }
 
         int choice = operationComboBox.getSelectionModel().getSelectedIndex() + 1;
+        String commentText = commentField.getText();
+        boolean shouldWriteComment = commentCheckBox.isSelected();
+
         dialog.close();
 
         new Thread(() -> {
             try {
+                // Передаём настройки комментария в TerminalApp
+                terminalApp.setCommentText(commentText);
+                terminalApp.setShouldWriteComment(shouldWriteComment);
+
                 terminalApp.getFileProcessingService().processFile(choice, filePath);
-                Platform.runLater(() -> {
-                    new Alert(Alert.AlertType.INFORMATION, "Verarbeitung abgeschlossen.", ButtonType.OK).showAndWait();
-                    terminalApp.hideProcessingButtons();
-                });
+
+
             } catch (InterruptedException ex) {
                 Platform.runLater(() -> {
                     new Alert(Alert.AlertType.INFORMATION, "Verarbeitung gestoppt.", ButtonType.OK).showAndWait();

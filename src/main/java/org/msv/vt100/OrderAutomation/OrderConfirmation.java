@@ -74,7 +74,7 @@ public class OrderConfirmation {
             if (cursorPosition.equals("3,24") && screenText.contains("Programm - Nr.:")) {
                 System.out.println("Найден 'Programm - Nr.:' на 3,24. Отправляю '5.0321'.");
                 sendDataWithDelay("5.0321\r");
-                Thread.sleep(100);
+                Thread.sleep(200);
             } else if (cursorPosition.equals(STARTUP_CURSOR) && (screenText.contains("Auf-Nr.:") || screenText.contains("LB-Nr.:"))) {
                 System.out.println("Стартовая страница достигнута. Позиция курсора: " + STARTUP_CURSOR);
                 break;
@@ -135,7 +135,7 @@ public class OrderConfirmation {
                     System.out.println("Экран ввода позиции обнаружен.");
                     break;
                 }
-                Thread.sleep(100);
+                Thread.sleep(200);
             }
             System.out.println("Отправляю номер позиции: " + positionNumber);
             sendDataWithDelay(positionNumber);
@@ -176,14 +176,14 @@ public class OrderConfirmation {
                             break;
                         }
                         sendDataWithDelay("\u001BOQ");
-                        Thread.sleep(100);
+                        Thread.sleep(200);
                     }
                     return;
                 } else if (currentCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale")) {
                     System.out.println("Достигнут экран для ввода даты поставки. Отправляю дату поставки: " + deliveryDate);
                     sendDataWithDelay(deliveryDate);
                     sendDataWithDelay("\r");
-                    Thread.sleep(100);
+                    Thread.sleep(200);
 
                     /*String alertCursor;
                     String alertScreenText;
@@ -235,7 +235,7 @@ public class OrderConfirmation {
                             System.out.println("Условия для ввода номера подтверждения выполнены.");
                             break;
                         }
-                        Thread.sleep(100);
+                        Thread.sleep(200);
                     }
                     System.out.println("Отправляю номер подтверждения: " + confirmationNumber);
                     sendDataWithDelay(confirmationNumber);
@@ -259,7 +259,7 @@ public class OrderConfirmation {
                         if (cur.equals("4,11") && screenText.contains("Pos.")) {
                             System.out.println("Курсор на 4,11 с 'Pos.' обнаружен. Пропущены условия стартовой страницы. Отправляю \"\\u001BOQ\" для возврата на шаг назад.");
                             sendDataWithDelay("\u001BOQ");
-                            Thread.sleep(100);  // задержка для обновления экрана
+                            Thread.sleep(200);  // задержка для обновления экрана
                             continue; // переходим к следующей итерации цикла для повторной проверки
                         }
 
@@ -268,7 +268,7 @@ public class OrderConfirmation {
                             break;
                         }
                         sendDataWithDelay("\r");
-                        Thread.sleep(100);
+                        Thread.sleep(200);
                     }
                     return;
                 } else if (screenText.contains("Bitte ausloesen !") && !(currentCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale"))) {
@@ -295,11 +295,11 @@ public class OrderConfirmation {
                             break;
                         }
                         sendDataWithDelay("\u001BOQ");
-                        Thread.sleep(100);
+                        Thread.sleep(200);
                     }
                     return;
                 } else {
-                    Thread.sleep(100);
+                    Thread.sleep(200);
                 }
             }
         }
@@ -330,7 +330,7 @@ public class OrderConfirmation {
     private void sendDataWithDelay(String data) throws IOException, InterruptedException {
         System.out.println("Sende Daten an SSH: '" + data + "' mit Verzögerung.");
         sshConnector.send(data);
-        int sleepTime = 100;
+        int sleepTime = 200;
         int interval = 50;
         int elapsed = 0;
         while (elapsed < sleepTime) {

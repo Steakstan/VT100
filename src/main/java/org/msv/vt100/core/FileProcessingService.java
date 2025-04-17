@@ -1,5 +1,8 @@
 package org.msv.vt100.core;
 
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.msv.vt100.OrderAutomation.DeliveryDateProcessor;
@@ -59,40 +62,56 @@ public class FileProcessingService {
         logger.info("Opening Excel file: {}", excelFilePath);
         isPaused.set(false);
         isStopped.set(false);
+
         try (FileInputStream fileInputStream = new FileInputStream(excelFilePath);
              Workbook workbook = new XSSFWorkbook(fileInputStream)) {
 
             Sheet sheet = workbook.getSheetAt(0);
             Row firstRow = sheet.getRow(0);
             if (firstRow == null) {
-                logger.error("Excel file is empty. Exiting.");
-                return;
+                throw new IllegalStateException("Excel-Datei enthält keine Daten.");
             }
 
             int columnCount = firstRow.getLastCellNum();
             if (choice == 1 && columnCount < 3) {
-                logger.error("Invalid table format for order processing. At least 3 columns expected.");
-                return;
+                throw new IllegalArgumentException("Ungültiges Format für Bestellverarbeitung. Mindestens 3 Spalten erwartet.");
             } else if ((choice == 2 || choice == 3) && columnCount != 2) {
-                logger.error("Invalid table format for comment processing. Exactly 2 columns expected.");
-                return;
+                throw new IllegalArgumentException("Ungültiges Format für Kommentarverarbeitung. Genau 2 Spalten erwartet.");
             } else if (choice == 4 && columnCount < 3) {
-                logger.error("Invalid table format for delivery date processing. At least 3 columns expected.");
-                return;
+                throw new IllegalArgumentException("Ungültiges Format für Lieferterminverarbeitung. Mindestens 3 Spalten erwartet.");
             }
 
-            Iterator<Row> rows = sheet.iterator();
             if (choice == 1) {
                 OrderConfirmation orderConfirmation = new OrderConfirmation(sshManager, cursor, terminalApp, screenTextDetector);
-                orderConfirmation.processOrders(rows);
+                orderConfirmation.processOrders(sheet.iterator());
+                showInfo("Verarbeitung abgeschlossen.");
             } else if (choice == 4) {
                 DeliveryDateProcessor deliveryDateProcessor = new DeliveryDateProcessor(sshManager, cursor, terminalApp, screenTextDetector);
-                deliveryDateProcessor.processDeliveryDates(rows);
+                deliveryDateProcessor.processDeliveryDates(sheet);
+                showInfo("Verarbeitung abgeschlossen.");
             } else {
-                logger.warn("Processing for the selected type (choice = {}) is not implemented.", choice);
+                logger.warn("Verarbeitungstyp '{}' nicht implementiert.", choice);
             }
+
         } catch (Exception e) {
-            logger.error("Error processing file: {}", excelFilePath, e);
+            logger.error("Fehler bei der Verarbeitung: {}", excelFilePath, e);
+            String message = e.getMessage() != null ? e.getMessage() : "Unbekannter Fehler";
+            showError("Verarbeitung fehlgeschlagen:\n" + message);
         }
     }
+
+    private void showInfo(String msg) {
+        Platform.runLater(() -> {
+            new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK).showAndWait();
+            terminalApp.hideProcessingButtons();
+        });
+    }
+
+    private void showError(String msg) {
+        Platform.runLater(() -> {
+            new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK).showAndWait();
+            terminalApp.hideProcessingButtons();
+        });
+    }
+
 }

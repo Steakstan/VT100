@@ -150,7 +150,7 @@ public class PositionssucheProcessor {
                 terminalApp.checkForPause();
                 if (terminalApp.isStopped()) return;
                 deferredMatch = null;
-                resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder, false);
+                resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                 sendDataWithDelay("\r");
                 Thread.sleep(150);
                 if (deferredMatch != null) {
@@ -208,7 +208,7 @@ public class PositionssucheProcessor {
                 }
                 String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
-                    resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder, false);
+                    resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                     sendDataWithDelay("\u001BOQ");
                     finished = true;
                 }
@@ -241,51 +241,71 @@ public class PositionssucheProcessor {
     }
 
     private int scanLinesAndWriteMatches(ScreenBuffer buffer, Sheet resultSheet, String[] firmNumbers, String order,
-                                         int resultRowIndex, CellStyle defaultCellStyle, Map<String, Row> processedRows, boolean transitioned) throws Exception {
-        for (int line = 7; line <= 22; line++) {
+                                         int resultRowIndex, CellStyle defaultCellStyle, Map<String, Row> processedRows) throws Exception {
+        boolean pageHasMore = true;
+
+        while (pageHasMore) {
             terminalApp.checkForPause();
             if (terminalApp.isStopped()) return resultRowIndex;
-            String cellFirm = CellValueExtractor.extractCells(buffer, line, 4, 5, 6, 7);
-            for (String firm : firmNumbers) {
-                if (cellFirm.equals(firm)) {
-                    String position = CellValueExtractor.extractCells(buffer, line, 0, 1, 2, 3);
-                    String key = firm + "_" + position;
-                    if (processedRows.containsKey(key)) {
-                        Row existingRow = processedRows.get(key);
-                        if (line == 22 && !transitioned) {
-                            updateRow22(existingRow, buffer, defaultCellStyle);
-                            performPageTransition();
-                            String newModelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                            Cell cellModelNumber = existingRow.getCell(4);
-                            if (cellModelNumber == null) {
-                                cellModelNumber = existingRow.createCell(4);
+
+            boolean pageTransitioned = false;
+
+            for (int line = 7; line <= 22; line++) {
+                terminalApp.checkForPause();
+                if (terminalApp.isStopped()) return resultRowIndex;
+
+                String cellFirm = CellValueExtractor.extractCells(buffer, line, 4, 5, 6, 7);
+                for (String firm : firmNumbers) {
+                    if (cellFirm.equals(firm)) {
+                        String position = CellValueExtractor.extractCells(buffer, line, 0, 1, 2, 3);
+                        String key = firm + "_" + position;
+                        if (!processedRows.containsKey(key)) {
+                            Row newRow = resultSheet.createRow(resultRowIndex++);
+                            processedRows.put(key, newRow);
+
+                            if (line == 22) {
+                                // Записать строку 22
+                                writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
+
+                                // Переход на новую страницу
+                                performPageTransition();
+                                Thread.sleep(200); // Ждём обновления экрана
+
+                                // Чтение modelNumber после перехода
+                                String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
+                                Cell cellModel = newRow.createCell(4);
+                                cellModel.setCellValue(modelNumber);
+                                cellModel.setCellStyle(defaultCellStyle);
+
+                                // Отмечаем, что мы перешли страницу — начать новую итерацию while
+                                pageTransitioned = true;
+                                break;
+                            } else {
+                                // Обычная строка
+                                writeNormalRow(newRow, buffer, line, defaultCellStyle, firm, order, position);
                             }
-                            cellModelNumber.setCellValue(newModelNumber);
-                            cellModelNumber.setCellStyle(defaultCellStyle);
-                            return scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRows, true);
-                        } else {
-                            updateNormalRow(existingRow, buffer, line, defaultCellStyle);
-                        }
-                    } else {
-                        Row newRow = resultSheet.createRow(resultRowIndex++);
-                        processedRows.put(key, newRow);
-                        if (line == 22 && !transitioned) {
-                            writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
-                            performPageTransition();
-                            String newModelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                            Cell cellModelNumber = newRow.createCell(4);
-                            cellModelNumber.setCellValue(newModelNumber);
-                            cellModelNumber.setCellStyle(defaultCellStyle);
-                            return scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRows, true);
-                        } else {
-                            writeNormalRow(newRow, buffer, line, defaultCellStyle, firm, order, position);
                         }
                     }
                 }
+
+                if (pageTransitioned) break; // выйти из for, чтобы заново начать с новой страницы
+            }
+
+            if (!pageTransitioned) {
+                // Если не перешли страницу — проверяем курсор и переходим вручную, если возможно
+                String currentCursor = getCursorPosition();
+                if (currentCursor.equals("23,10")) {
+                    sendDataWithDelay("\u001BOQ"); // Taste F2 — nächste Seite
+                    Thread.sleep(150);
+                } else {
+                    pageHasMore = false; // больше страниц нет — выходим
+                }
             }
         }
+
         return resultRowIndex;
     }
+
 
     private void writeRow22(Row row, ScreenBuffer buffer, CellStyle defaultCellStyle, String firm, String order, String position) {
         Cell cellFirm = row.createCell(0);
@@ -396,12 +416,12 @@ public class PositionssucheProcessor {
 
     private void performPageTransition() throws Exception {
         sendDataWithDelay("\r");
-        Thread.sleep(150);
+        Thread.sleep(70);
     }
 
     private void sendDataWithDelay(String data) throws Exception {
         sshManager.send(data);
-        Thread.sleep(150);
+        Thread.sleep(70);
     }
 
     private static class DeferredMatch {

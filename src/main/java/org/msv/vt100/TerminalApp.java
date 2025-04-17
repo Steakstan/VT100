@@ -54,6 +54,8 @@ public class TerminalApp extends Application {
     private UIController uiController;
     private CustomTerminalWindow customTerminalWindow;
     private SSHConfig currentProfile;
+    private String commentText = "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
+    private boolean shouldWriteComment = true;
 
     // SSH service
     private SSHManager sshManager;
@@ -255,7 +257,7 @@ public class TerminalApp extends Application {
      */
     private void startScreenUpdater() {
         Timeline screenUpdateTimeline = new Timeline(
-                new KeyFrame(Duration.millis(33), event -> updateScreen())
+                new KeyFrame(Duration.millis(16), event -> updateScreen())
         );
         screenUpdateTimeline.setCycleCount(Timeline.INDEFINITE);
         screenUpdateTimeline.play();
@@ -516,6 +518,22 @@ public class TerminalApp extends Application {
     }
     public Cursor getCursor() {
         return cursor;
+    }
+
+    public String getCommentText() {
+        return commentText;
+    }
+
+    public void setCommentText(String commentText) {
+        this.commentText = commentText;
+    }
+
+    public boolean isShouldWriteComment() {
+        return shouldWriteComment;
+    }
+
+    public void setShouldWriteComment(boolean shouldWriteComment) {
+        this.shouldWriteComment = shouldWriteComment;
     }
 
     /**
