@@ -56,12 +56,4 @@ public class Cursor {
         this.column = 0;
     }
 
-    public String getCursorPositionString() {
-        lock.lock();
-        try {
-            return (row + 1) + "," + (column + 1);
-        } finally {
-            lock.unlock();
-        }
-    }
 }

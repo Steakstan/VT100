@@ -26,10 +26,8 @@ import javafx.animation.Timeline;
 import javafx.util.Duration;
 
 import java.io.File;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * TerminalApp is a JavaFX application that emulates a VT520-type terminal with SSH connectivity.

@@ -23,7 +23,7 @@ public class OptionalMenuBar extends HBox {
     private Button currentPopupButton = null;
     private final TerminalApp terminalApp;
 
-    public OptionalMenuBar(Stage primaryStage, TerminalApp terminalApp) {
+    public OptionalMenuBar(TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
 
         setSpacing(1);
@@ -38,9 +38,9 @@ public class OptionalMenuBar extends HBox {
         btnBearbeiten.setOnAction(e -> togglePopup(btnBearbeiten));
         btnLog.setOnAction(e -> togglePopup(btnLog));
 
-        setupHoverToggle(btnDatei, primaryStage);
-        setupHoverToggle(btnBearbeiten, primaryStage);
-        setupHoverToggle(btnLog, primaryStage);
+        setupHoverToggle(btnDatei);
+        setupHoverToggle(btnBearbeiten);
+        setupHoverToggle(btnLog);
 
         getChildren().addAll(btnDatei, btnBearbeiten, btnLog);
     }
@@ -52,7 +52,7 @@ public class OptionalMenuBar extends HBox {
         return button;
     }
 
-    private void setupHoverToggle(Button button, Stage stage) {
+    private void setupHoverToggle(Button button) {
         button.setOnMouseEntered(e -> {
             if (currentPopup != null && currentPopupButton != button) {
                 togglePopup(button);

@@ -91,7 +91,7 @@ public class TerminalCanvas extends Canvas {
                 boolean isCursor = (row == cursorRow && col == cursorCol && cursorVisible);
 
                 if (!"transparent".equalsIgnoreCase(bgColor)) {
-                    gc.setFill(getCachedColor(bgColor, 1));
+                    gc.setFill(getCachedColor(bgColor));
                     gc.fillRect(x, y, w, h);
                 }
 
@@ -101,21 +101,21 @@ public class TerminalCanvas extends Canvas {
                 }
 
                 if (isCursor) {
-                    gc.setStroke(getCachedColor(fillColor, 1));
+                    gc.setStroke(getCachedColor(fillColor));
                     gc.setLineWidth(2);
                     gc.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
                 }
 
                 if (!ch.isBlank()) {
                     gc.setFont(bold ? boldFont : normalFont);
-                    gc.setFill(getCachedColor(fillColor, 1));
+                    gc.setFill(getCachedColor(fillColor));
                     gc.setTextAlign(TextAlignment.CENTER);
                     gc.setTextBaseline(VPos.CENTER);
                     gc.fillText(ch, x + w / 2, y + h / 2);
                 }
 
                 if (underline) {
-                    gc.setStroke(getCachedColor(fillColor, 1));
+                    gc.setStroke(getCachedColor(fillColor));
                     gc.setLineWidth(1);
                     gc.strokeLine(x, y + h - 2, x + w, y + h - 2);
                 }
@@ -130,10 +130,10 @@ public class TerminalCanvas extends Canvas {
 
     private void drawBoxCharacter(GraphicsContext gc, char c, double x, double y, double w, double h,
                                   String backgroundColor, String fillColor, boolean isCursor) {
-        gc.setFill("transparent".equals(backgroundColor) ? Color.TRANSPARENT : getCachedColor(backgroundColor, 1));
+        gc.setFill("transparent".equals(backgroundColor) ? Color.TRANSPARENT : getCachedColor(backgroundColor));
         gc.fillRect(x, y, w, h);
 
-        Color lineColor = getCachedColor(fillColor, 1);
+        Color lineColor = getCachedColor(fillColor);
         if (isCursor) lineColor = lineColor.brighter();
         gc.setStroke(lineColor);
         gc.setLineWidth(1.5);
@@ -160,9 +160,9 @@ public class TerminalCanvas extends Canvas {
         }
     }
 
-    private Color getCachedColor(String hex, double opacity) {
-        String key = hex + ":" + opacity;
-        return colorCache.computeIfAbsent(key, k -> Color.web(hex, opacity));
+    private Color getCachedColor(String hex) {
+        String key = hex + ":" + (double) 1;
+        return colorCache.computeIfAbsent(key, k -> Color.web(hex, 1));
     }
 
     private boolean isBoxDrawingChar(String ch) {

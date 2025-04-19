@@ -1,7 +1,6 @@
 package org.msv.vt100.ansiisequences;
 
 import org.msv.vt100.core.Cell;
-import org.msv.vt100.core.Cursor;
 import org.msv.vt100.core.ScreenBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

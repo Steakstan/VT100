@@ -368,17 +368,4 @@ public class PositionssucheProcessor {
         Thread.sleep(70);
     }
 
-    private static class DeferredMatch {
-        String firm;
-        String position;
-        String modelDescription;
-        String deliveryDate;
-
-        DeferredMatch(String firm, String position, String modelDescription, String deliveryDate) {
-            this.firm = firm;
-            this.position = position;
-            this.modelDescription = modelDescription;
-            this.deliveryDate = deliveryDate;
-        }
-    }
 }

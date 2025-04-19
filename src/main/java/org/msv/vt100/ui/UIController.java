@@ -4,7 +4,6 @@ import javafx.application.Platform;
 import javafx.stage.Stage;
 import org.msv.vt100.core.Cursor;
 import org.msv.vt100.core.InputHandler;
-import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.ScreenBuffer;
 

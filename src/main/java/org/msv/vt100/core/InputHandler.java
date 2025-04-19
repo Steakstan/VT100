@@ -194,9 +194,7 @@ public class InputHandler {
         screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.character(), highlightStyle));
 
         // Restore the original style after 1 second
-        Timeline restoreStyleTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-            screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.character(), originalStyle));
-        }));
+        Timeline restoreStyleTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> screenBuffer.setCell(currentRow, currentColumn, new Cell(currentCell.character(), originalStyle))));
         restoreStyleTimeline.setCycleCount(1);
         restoreStyleTimeline.play();
     }

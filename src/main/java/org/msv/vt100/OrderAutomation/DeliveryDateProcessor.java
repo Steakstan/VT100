@@ -95,7 +95,7 @@ public class DeliveryDateProcessor {
         }
 
         if (!(weFilialeScreenDetected || bitteAusloesenDetected)) {
-            if (!waitForOkPromptAndCompareDate(deliveryDate, confirmationNumber, hasConfirmationCol)) {
+            if (!waitForOkPromptAndCompareDate(deliveryDate, hasConfirmationCol)) {
                 return;
             }
         }
@@ -116,7 +116,7 @@ public class DeliveryDateProcessor {
 
 
 
-    private boolean waitForOkPromptAndCompareDate(String deliveryDate, String confirmationNumber, boolean hasConfirmationColumn) throws IOException, InterruptedException {
+    private boolean waitForOkPromptAndCompareDate(String deliveryDate, boolean hasConfirmationColumn) throws IOException, InterruptedException {
         System.out.println("Warte auf Bedingung: 'OK (J/N/L/T/G)' bei Cursor 13,74.");
         while (true) {
             terminalApp.checkForPause();
@@ -541,7 +541,7 @@ public class DeliveryDateProcessor {
 
 
 
-    private String captureRelevantScreenPart() throws InterruptedException {
+    private String captureRelevantScreenPart() {
         StringBuilder snapshot = new StringBuilder();
         for (int col = 35; col <= 68; col++) {
             snapshot.append(terminalApp.getScreenBuffer().getCell(8, col).character());
@@ -624,16 +624,14 @@ public class DeliveryDateProcessor {
 
 
 
-    private String getInitialScreenText() {
+    private void getInitialScreenText() {
         try {
             java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
             String screenText = (String) method.invoke(screenTextDetector);
             System.out.println("Initialer Bildschirmtext: " + screenText);
-            return screenText;
         } catch (Exception e) {
             String fallback = screenTextDetector.toString();
             System.out.println("Fehler beim Abruf des Bildschirmtextes, fallback auf toString(): " + fallback);
-            return fallback;
         }
     }
     private boolean shouldWriteComment() {

@@ -4,7 +4,6 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.layout.*;
-import javafx.stage.Stage;
 import org.msv.vt100.TerminalApp;
 
 public class ContentPanel extends BorderPane {
