@@ -16,11 +16,17 @@ import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.ui.TerminalDialog;
 import org.msv.vt100.util.CellValueExtractor;
+import org.msv.vt100.util.Waiter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+
+import static org.msv.vt100.util.Waiter.waitUntil;
 
 public class PositionssucheProcessor {
 
@@ -31,6 +37,7 @@ public class PositionssucheProcessor {
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
     private final SSHManager sshManager;
+    private static final Logger log = LoggerFactory.getLogger(PositionssucheProcessor.class);
 
     public PositionssucheProcessor(String orderFilePath, String outputFilePath, String userNumber,
                                    TerminalApp terminalApp, ScreenBuffer screenBuffer, Cursor cursor) {
@@ -53,7 +60,7 @@ public class PositionssucheProcessor {
                     onCompletion.run();
                 });
             } catch (Exception ex) {
-                ex.printStackTrace();
+                log.error("Fehler bei der Positionssuche", ex);
                 Platform.runLater(() -> {
                     terminalApp.hideProcessingButtons();
                     TerminalDialog.showError("Fehler bei der Positionssuche: " + ex.getMessage(), terminalApp.getUIController().getPrimaryStage());
@@ -133,14 +140,15 @@ public class PositionssucheProcessor {
             while (!getCursorPosition().equals("3,13")) {
                 if (terminalApp.isStopped()) break;
                 terminalApp.checkForPause();
-                Thread.sleep(250);
+                waitUntil("Warte auf Cursor 3,13", () -> getCursorPosition().equals("3,13"));
             }
             if (terminalApp.isStopped()) break;
             sendDataWithDelay(order);
-            Thread.sleep(150);
+            Waiter.waitFor(() -> true, Duration.ofMillis(100), Duration.ofMillis(100)).get();
             ScreenTextDetector detector = new ScreenTextDetector(screenBuffer);
             while (detector.isAchtungDisplayed()) {
-                Thread.sleep(3000);
+                waitUntil("Achtung verschwunden", () -> !new ScreenTextDetector(screenBuffer).isAchtungDisplayed());
+
             }
             boolean finished = false;
             while (!finished) {
@@ -148,7 +156,7 @@ public class PositionssucheProcessor {
                 if (terminalApp.isStopped()) return;
                 resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                 sendDataWithDelay("\r");
-                Thread.sleep(150);
+                Waiter.waitFor(() -> true, Duration.ofMillis(100), Duration.ofMillis(100)).get();
                 String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
                     resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
@@ -210,7 +218,8 @@ public class PositionssucheProcessor {
                             if (line == 22) {
                                 writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
                                 performPageTransition();
-                                Thread.sleep(200);
+                                Waiter.waitFor(() -> true, Duration.ofMillis(200), Duration.ofMillis(200)).get();
+
                                 String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
                                 Cell cellModel = newRow.createCell(4);
                                 cellModel.setCellValue(modelNumber);
@@ -240,7 +249,7 @@ public class PositionssucheProcessor {
                 String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
                     sendDataWithDelay("\u001BOQ"); // Taste F2 — nächste Seite
-                    Thread.sleep(150);
+                    Waiter.waitFor(() -> true, Duration.ofMillis(150), Duration.ofMillis(150)).get();
                 } else {
                     pageHasMore = false; // больше страниц нет — выходим
                 }
@@ -365,7 +374,10 @@ public class PositionssucheProcessor {
 
     private void sendDataWithDelay(String data) throws Exception {
         sshManager.send(data);
-        Thread.sleep(70);
+        waitUntil("Bildschirmänderung nach Senden", () -> true); // просто пауза без ожидания — можно указать custom timeout
     }
+
+
+
 
 }

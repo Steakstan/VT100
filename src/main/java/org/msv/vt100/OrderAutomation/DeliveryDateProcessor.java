@@ -12,6 +12,9 @@ import org.msv.vt100.util.ExcelOrderData;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.msv.vt100.util.Waiter.waitUntil;
 
 public class DeliveryDateProcessor {
     private final SSHManager sshConnector;
@@ -118,99 +121,148 @@ public class DeliveryDateProcessor {
 
     private boolean waitForOkPromptAndCompareDate(String deliveryDate, boolean hasConfirmationColumn) throws IOException, InterruptedException {
         System.out.println("Warte auf Bedingung: 'OK (J/N/L/T/G)' bei Cursor 13,74.");
-        while (true) {
+
+        boolean success = waitUntil("Cursor = 13,74 & Text enthält 'OK (J/N/L/T/G)'", () -> {
             terminalApp.checkForPause();
             String currCursor = getCursorPosition();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Cursor bei OK-Bedingung: " + currCursor + "; Bildschirmtext: " + screenText);
-            if (currCursor.equals("13,74") && screenText.contains("OK (J/N/L/T/G)")) {
-                String existingDate = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 37, 38, 39, 40);
-                String ab1 = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 50);
-                String ab2 = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 51);
-                boolean confirmationMissing = (ab1 + ab2).trim().isEmpty();
+            return currCursor.equals("13,74") && screenText.contains("OK (J/N/L/T/G)");
+        });
 
-                System.out.println("Vergleiche vorhandenes Lieferdatum (" + existingDate + ") mit dem Excel-Datum (" + deliveryDate + ").");
-                System.out.println("Besteht eine AB-Spalte in Excel? " + hasConfirmationColumn + ", und ist AB-Feld leer? " + confirmationMissing);
-
-                if (existingDate.equals(deliveryDate) && !(hasConfirmationColumn && confirmationMissing)) {
-                    System.out.println("INFO: Lieferdatum ist bereits gesetzt und AB vorhanden. Verarbeitung wird übersprungen.");
-                    navigateToStartPage();
-                    return false;
-                }
-                System.out.println("Bedingung erfüllt. Sende 'N'.");
-                sendDataWithDelay("N");
-                sendDataWithDelay("\r");
-
-                // 🔽 Neue Bedingung: sofort prüfen, ob 'Bitte ausloesen !' erscheint
-                Thread.sleep(100);
-                String postNscreen = getScreenText();
-                String postNcursor = getCursorPosition();
-                if (postNcursor.equals("24,80") && postNscreen.contains("Bitte ausloesen !")) {
-                    System.out.println("Nach 'N': 'Bitte ausloesen !' erkannt. Starte entsprechende Verarbeitung.");
-                    handleBitteAusloesenLoop();
-                }
-
-                break;
-            }
-            Thread.sleep(50);
+        if (!success) {
+            System.out.println("[WARNUNG] Timeout beim Warten auf OK-Prompt.");
+            return false;
         }
+
+        String existingDate = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 37, 38, 39, 40);
+        String ab1 = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 50);
+        String ab2 = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 51);
+        boolean confirmationMissing = (ab1 + ab2).trim().isEmpty();
+
+        System.out.println("Vergleiche vorhandenes Lieferdatum (" + existingDate + ") mit dem Excel-Datum (" + deliveryDate + ").");
+        System.out.println("Besteht eine AB-Spalte in Excel? " + hasConfirmationColumn + ", und ist AB-Feld leer? " + confirmationMissing);
+
+        if (existingDate.equals(deliveryDate) && !(hasConfirmationColumn && confirmationMissing)) {
+            System.out.println("INFO: Lieferdatum ist bereits gesetzt und AB vorhanden. Verarbeitung wird übersprungen.");
+            navigateToStartPage();
+            return false;
+        }
+
+        System.out.println("Bedingung erfüllt. Sende 'N'.");
+        sendDataWithDelay("N");
+        sendDataWithDelay("\r");
+
         return true;
     }
 
 
 
+
+
+
     private void handleBitteAusloesenLoop() throws IOException, InterruptedException {
-        System.out.println("Überprüfe, ob 'Bitte ausloesen !' bei Cursor 24,80 angezeigt wird.");
+        System.out.println("Starte Schleife für 'Bitte ausloesen !'.");
+
+        boolean erkannt = waitUntil("Cursor = 24,80 & Text enthält 'Bitte ausloesen !'", () -> {
+            terminalApp.checkForPause();
+            String cursor = getCursorPosition();
+            String screenText = getScreenText();
+            System.out.println("[DEBUG] Cursor bei 'Bitte ausloesen !'-Prüfung: " + cursor + "; Bildschirmtext: " + screenText);
+            return cursor.equals("24,80") && screenText.contains("Bitte ausloesen !");
+        });
+
+        if (!erkannt) {
+            System.out.println("INFO: 'Bitte ausloesen !' nicht erkannt.");
+            return;
+        }
+
         while (true) {
             terminalApp.checkForPause();
-            String currCursor = getCursorPosition();
-            String screenText = getScreenText();
-            System.out.println("[DEBUG] Cursor bei 'Bitte ausloesen !'-Prüfung: " + currCursor + "; Bildschirmtext: " + screenText);
-            if (currCursor.equals("24,80") && screenText.contains("Bitte ausloesen !")) {
-                System.out.println("Meldung erkannt. Sende Enter.");
+            String before = getScreenText();
+            String cursorBefore = getCursorPosition();
+
+            if (cursorBefore.equals("24,80") && before.contains("Bitte ausloesen !")) {
+                System.out.println("Sende Enter (ausloesen-Schleife).");
                 sendDataWithDelay("\r");
-                Thread.sleep(50);
-            } else if (!screenText.contains("Bitte ausloesen !")) {
-                System.out.println("'Bitte ausloesen !' ist nicht mehr vorhanden.");
-                break;
+
+                // Warten, bis Bildschirm sich ändert
+                boolean changed = waitUntil("Bildschirm ändert sich nach Enter", () -> {
+                    terminalApp.checkForPause();
+                    return !getScreenText().equals(before);
+                });
+
+                if (!changed) {
+                    System.out.println("Bildschirm hat sich nicht geändert. Breche aus Schleife aus.");
+                    break;
+                }
+
+                // Warten auf vollständiges Verschwinden von 'Bitte ausloesen !'
+                boolean verschwunden = waitUntil("'Bitte ausloesen !' verschwunden", () -> {
+                    terminalApp.checkForPause();
+                    String after = getScreenText();
+                    String currentCursor = getCursorPosition();
+                    return !after.contains("Bitte ausloesen !") || !currentCursor.equals("24,80");
+                });
+
+                if (verschwunden) {
+                    System.out.println("'Bitte ausloesen !' verschwunden.");
+                    break;
+                }
             } else {
-                Thread.sleep(50);
+                System.out.println("'Bitte ausloesen !' nicht mehr sichtbar.");
+                break;
             }
         }
     }
 
+
+
     private void waitForDeliveryDateInputPrompt(String deliveryDate) throws IOException, InterruptedException {
         System.out.println("Warte auf 'Vorgesehene WE-Filiale' bei Cursor 9,36, um das Lieferdatum zu senden.");
-        while (true) {
+
+        // 👉 Direkt prüfen: ggf. zuerst 'Bitte ausloesen !' verarbeiten
+        if (getCursorPosition().equals("24,80") && getScreenText().contains("Bitte ausloesen !")) {
+            System.out.println("'Bitte ausloesen !' erkannt – starte Schleife vor Lieferdatum.");
+            handleBitteAusloesenLoop();
+        }
+
+        boolean success = waitUntil("Cursor = 9,36 & Text enthält 'Vorgesehene WE-Filiale'", () -> {
             terminalApp.checkForPause();
             String currCursor = getCursorPosition();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Cursor bei WE-Filiale: " + currCursor + "; Bildschirmtext: " + screenText);
-            if (currCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale")) {
-                System.out.println("Bedingung erfüllt. Sende Lieferdatum: " + deliveryDate);
-                sendDataWithDelay(deliveryDate);
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(50);
-        }
+            return currCursor.equals("9,36") && screenText.contains("Vorgesehene WE-Filiale");
+        });
+
+        if (!success) throw new IOException("Timeout beim Warten auf Eingabefeld für Lieferdatum");
+
+        System.out.println("Bedingung erfüllt. Sende Lieferdatum: " + deliveryDate);
+        sendDataWithDelay(deliveryDate);
+        sendDataWithDelay("\r");
     }
+
+
+
 
     private void waitForBestellTerminWarningsToDisappear() throws InterruptedException {
         System.out.println("Überprüfe, ob Meldungen 'Bestell-Termin um ' und 'ueberschritten!' angezeigt werden.");
-        while (true) {
+
+        boolean success = waitUntil("Warnung 'Bestell-Termin um ... ueberschritten!'", () -> {
             terminalApp.checkForPause();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Während 'Bestell-Termin'-Prüfung: " + screenText);
-            if (screenText.contains("Bestell-Termin um ") && screenText.contains("ueberschritten!")) {
-                System.out.println("Meldungen erkannt. Warte auf ihr Verschwinden.");
-                Thread.sleep(50);
-            } else {
-                System.out.println("Keine kritischen Meldungen mehr.");
-                break;
-            }
+            return !(screenText.contains("Bestell-Termin um ") && screenText.contains("ueberschritten!"));
+        });
+
+        if (success) {
+            System.out.println("Keine kritischen Meldungen mehr.");
+        } else {
+            System.out.println("[WARNUNG] Timeout beim Warten auf das Verschwinden der Bestell-Termin-Warnung.");
         }
     }
+
+
     private void handleFinalInputSequence(String deliveryDate, String confirmationNumber, boolean hasConfirmationCol) throws IOException, InterruptedException {
         sendDataWithDelay("T");
         sendDataWithDelay("\r");
@@ -236,229 +288,251 @@ public class DeliveryDateProcessor {
 
     private void waitForErfassenAbNummer(String confirmationNumber, boolean hasConfirmationCol) throws IOException, InterruptedException {
         System.out.println("Warte auf 'Erfassen AB-Nummer' bei Cursor 14,31.");
-        while (true) {
+
+        boolean success = waitUntil("Cursor = 14,31 & Text enthält 'Erfassen AB-Nummer'", () -> {
             terminalApp.checkForPause();
             String cursor = getCursorPosition();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Cursor = " + cursor + ", Text = " + screenText);
-            if (cursor.equals("14,31") && screenText.contains("Erfassen AB-Nummer")) {
-                System.out.println("'Erfassen AB-Nummer' erkannt.");
-                if (hasConfirmationCol && confirmationNumber != null && !confirmationNumber.isEmpty()) {
-                    System.out.println("Sende AB-Nummer: " + confirmationNumber);
-                    sendDataWithDelay(confirmationNumber);
-                    sendDataWithDelay("\r");
-                } else {
-                    System.out.println("Keine AB-Nummer vorhanden oder nicht erforderlich. Sende Enter.");
-                    sendDataWithDelay("\r");
-                }
-                break;
-            }
-            Thread.sleep(50);
+            return cursor.equals("14,31") && screenText.contains("Erfassen AB-Nummer");
+        });
+
+        if (!success) throw new IOException("Timeout beim Warten auf Eingabe 'Erfassen AB-Nummer'");
+
+        System.out.println("'Erfassen AB-Nummer' erkannt.");
+        if (hasConfirmationCol && confirmationNumber != null && !confirmationNumber.isEmpty()) {
+            System.out.println("Sende AB-Nummer: " + confirmationNumber);
+            sendDataWithDelay(confirmationNumber);
+            sendDataWithDelay("\r");
+        } else {
+            System.out.println("Keine AB-Nummer vorhanden oder nicht erforderlich. Sende Enter.");
+            sendDataWithDelay("\r");
         }
     }
+
+
+
 
 
 
     private void waitForCursorAt960() throws IOException, InterruptedException {
         System.out.println("Warte auf Cursorposition 9,60.");
-        while (true) {
+
+        boolean success = waitUntil("Cursor = 9,60", () -> {
             terminalApp.checkForPause();
             String cursor = getCursorPosition();
-            if (cursor.equals("9,60")) {
-                System.out.println("Cursor erkannt. Sende Enter.");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(50);
-        }
+            return cursor.equals("9,60");
+        });
+
+        if (!success) throw new IOException("Timeout beim Warten auf Cursor 9,60");
+
+        System.out.println("Cursor erkannt. Sende Enter.");
+        sendDataWithDelay("\r");
     }
+
+
 
     private void checkForBitteAusloesenNach960() throws IOException, InterruptedException {
         System.out.println("Prüfe nach 9,60, ob 'Bitte ausloesen !' erscheint.");
-        long start = System.currentTimeMillis();
-        boolean erkannt = false;
-        while (System.currentTimeMillis() - start < 500) {
-            terminalApp.checkForPause();
-            String screenText = getScreenText();
-            String cursor = getCursorPosition();
-            if (cursor.equals("24,80") && screenText.contains("Bitte ausloesen !")) {
-                erkannt = true;
-                System.out.println("'Bitte ausloesen !' erkannt. Beginne Enter-Schleife.");
-                break;
-            }
-            if (screenText.contains("Eingaben OK") &&
-                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"))) {
-                System.out.println("'Eingaben OK' erkannt. Kein Auslösen notwendig.");
-                break;
-            }
-            Thread.sleep(50);
-        }
 
-        if (erkannt) {
+        AusloeserStatus status = waitForAusloeserOderAlternative();
+
+        if (status == AusloeserStatus.BITTE_AUSLOESEN) {
+            System.out.println("'Bitte ausloesen !' erkannt. Beginne Enter-Schleife.");
+
             while (true) {
                 terminalApp.checkForPause();
                 String before = getScreenText();
-                String beforeCursor = getCursorPosition();
+                String cursorBefore = getCursorPosition();
 
-                if (beforeCursor.equals("24,80") && before.contains("Bitte ausloesen !")) {
+                if (cursorBefore.equals("24,80") && before.contains("Bitte ausloesen !")) {
                     System.out.println("Sende Enter (ausloesen-Schleife).");
                     sendDataWithDelay("\r");
-                    Thread.sleep(50);
-                    String after = getScreenText();
-                    if (!after.equals(before)) {
-                        continue;
-                    }
-                    while (true) {
+
+                    boolean changed = waitUntil("Bildschirm nach Enter verändert sich", () -> {
                         terminalApp.checkForPause();
-                        Thread.sleep(50);
-                        after = getScreenText();
+                        return !getScreenText().equals(before);
+                    });
+
+                    if (!changed) {
+                        System.out.println("Keine Änderung erkannt. Schleife beendet.");
+                        break;
+                    }
+
+                    boolean verschwunden = waitUntil("'Bitte ausloesen !' verschwunden", () -> {
+                        terminalApp.checkForPause();
+                        String after = getScreenText();
                         String currentCursor = getCursorPosition();
-                        if (!after.equals(before)) break;
-                        if (!after.contains("Bitte ausloesen !") || !currentCursor.equals("24,80")) {
-                            System.out.println("'Bitte ausloesen !' verschwunden.");
-                            return;
-                        }
+                        return !after.contains("Bitte ausloesen !") || !currentCursor.equals("24,80");
+                    });
+
+                    if (verschwunden) {
+                        System.out.println("'Bitte ausloesen !' verschwunden.");
+                        break;
                     }
                 } else {
                     System.out.println("'Bitte ausloesen !' nicht mehr sichtbar.");
                     break;
                 }
             }
+
+        } else {
+            System.out.println("'Bitte ausloesen !' nicht erkannt oder andere Eingabe erkannt: " + status);
         }
     }
 
+
+
     private void waitForEingabenOkPromptAndSendZ() throws IOException, InterruptedException {
         System.out.println("Warte auf 'Eingaben OK' und Cursorposition 23,75–23,78.");
-        while (true) {
+
+        boolean success = waitUntil("Eingaben OK & Cursor zwischen 23,75–23,78", () -> {
             terminalApp.checkForPause();
             String cursor = getCursorPosition();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Cursor: " + cursor + "; Bildschirmtext: " + screenText);
-            if (screenText.contains("Eingaben OK") &&
-                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"))) {
-                System.out.println("Bedingung erfüllt. Sende 'Z'.");
-                sendDataWithDelay("Z");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(100);
-        }
+            return screenText.contains("Eingaben OK") &&
+                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"));
+        });
+
+        if (!success) throw new IOException("Timeout beim Warten auf Eingaben OK für 'Z'");
+
+        System.out.println("Bedingung erfüllt. Sende 'Z'.");
+        sendDataWithDelay("Z");
+        sendDataWithDelay("\r");
     }
 
+
+
     private void waitForInternerTextAndComment(String deliveryDate) throws IOException, InterruptedException {
-        System.out.println("Prüfe auf Cursorposition 22,2 und Text 'Interner Text'.");
-        while (true) {
-            terminalApp.checkForPause();
-            String cursor = getCursorPosition();
-            String screenText = getScreenText();
+        System.out.println("Warte auf 'Interner Text' oder 'Bitte ausloesen !'...");
 
-            if (cursor.equals("24,80") && screenText.contains("Bitte ausloesen !")) {
-                while (cursor.equals("24,80") && screenText.contains("Bitte ausloesen !")) {
-                    sendDataWithDelay("\r");
-                    Thread.sleep(50);
-                    cursor = getCursorPosition();
-                    screenText = getScreenText();
-                }
-            }
+        AusloeserStatus status = waitForAusloeserOderAlternative();
 
-            if (cursor.equals("22,2") && screenText.contains("Interner Text")) {
-                System.out.println("'Interner Text' erkannt. Sende Enter.");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(200);
+        // 🔁 Wenn 'Bitte ausloesen !' zuerst erscheint → Enter-Schleife bis verschwunden
+        while (status == AusloeserStatus.BITTE_AUSLOESEN) {
+            System.out.println("'Bitte ausloesen !' erkannt. Sende Enter und warte erneut...");
+            sendDataWithDelay("\r");
+
+            status = waitForAusloeserOderAlternative();
         }
 
-        while (true) {
+        if (status != AusloeserStatus.INTERNE_EINGABE) {
+            throw new IOException("Weder 'Bitte ausloesen !' noch 'Interner Text' erschienen.");
+        }
+
+        System.out.println("'Interner Text' erkannt. Sende Enter.");
+        sendDataWithDelay("\r");
+
+        // ⌛ Warten auf dreistellige Zahl
+        boolean nummerErkannt = waitUntil("Dreistellige Nummer in Zeile 22 erkannt", () -> {
             terminalApp.checkForPause();
             String numberText = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 22, 1, 2, 3);
             System.out.println("Extrahierte Zahl: " + numberText);
-            if (numberText.matches("\\d{3}")) {
-                String kw = extractWeekFromDeliveryDate(deliveryDate);
-                String template = getUserCommentTemplate();
-                String comment = template.replace("**", kw);
-                System.out.println("Sende Kommentar: " + comment);
-                sendDataWithDelay(comment);
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(50);
-        }
+            return numberText.matches("\\d{3}");
+        });
+
+        if (!nummerErkannt) throw new IOException("Timeout beim Warten auf dreistellige Nummer für Kommentar");
+
+        // 💬 Kommentar erzeugen und senden
+        String kw = extractWeekFromDeliveryDate(deliveryDate);
+        String template = getUserCommentTemplate();
+        String comment = template.replace("**", kw);
+        System.out.println("Sende Kommentar: " + comment);
+        sendDataWithDelay(comment);
+        sendDataWithDelay("\r");
     }
+
+
 
     private void waitForTextKZandOQSequence() throws IOException, InterruptedException {
         System.out.println("Warte auf 'Text-KZ' bei Cursorposition 22,74–22,78.");
-        while (true) {
+
+        boolean textKZPrompt = waitUntil("Cursor 22,74–78 & 'Text-KZ' erkannt", () -> {
             terminalApp.checkForPause();
             String cursor = getCursorPosition();
             String screenText = getScreenText();
-            if ((cursor.equals("22,74") || cursor.equals("22,73") || cursor.equals("22,78")) &&
-                    screenText.contains("Text-KZ")) {
-                System.out.println("Erkannt. Sende Enter.");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(1000);
-        }
+            return (cursor.equals("22,74") || cursor.equals("22,73") || cursor.equals("22,78")) &&
+                    screenText.contains("Text-KZ");
+        });
+
+        if (!textKZPrompt) throw new IOException("Timeout bei der ersten 'Text-KZ'-Eingabe");
+
+        System.out.println("Erkannt. Sende Enter.");
+        sendDataWithDelay("\r");
 
         System.out.println("Überprüfung der Position 22,2.");
-        while (true) {
+
+        boolean textKZBei22_2 = waitUntil("Cursor = 22,2 & Text enthält 'Text-KZ'", () -> {
             terminalApp.checkForPause();
             String cursor = getCursorPosition();
             String screenText = getScreenText();
-            if (cursor.equals("22,2") && screenText.contains("Text-KZ")) {
-                System.out.println("Sende '\u001BOQ' und warte auf Cursor 23,75–23,78.");
-                sendDataWithDelay("\u001BOQ");
-                Thread.sleep(50);
-                while (true) {
-                    terminalApp.checkForPause();
-                    cursor = getCursorPosition();
-                    if (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78")) {
-                        System.out.println("Zielposition erreicht: " + cursor);
-                        break;
-                    }
-                    Thread.sleep(200);
-                }
-                break;
-            }
-            Thread.sleep(1000);
-        }
+            return cursor.equals("22,2") && screenText.contains("Text-KZ");
+        });
+
+        if (!textKZBei22_2) throw new IOException("Timeout bei der zweiten 'Text-KZ'-Eingabe");
+
+        System.out.println("Sende '\u001BOQ' und warte auf Cursor 23,75–23,78.");
+        sendDataWithDelay("\u001BOQ");
+
+        boolean zielCursorErreicht = waitUntil("Zielcursor bei 23,75–23,78 erreicht", () -> {
+            terminalApp.checkForPause();
+            String cursor = getCursorPosition();
+            return cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78");
+        });
+
+        if (!zielCursorErreicht) throw new IOException("Timeout beim Warten auf Zielcursor nach OQ");
+        System.out.println("Zielposition erreicht.");
     }
+
 
     private void finalEingabenOkEnter() throws IOException, InterruptedException {
         System.out.println("Warte auf 'Eingaben OK' bei Cursorposition 23,75–23,78.");
-        while (true) {
+
+        boolean okErkannt = waitUntil("'Eingaben OK' + Cursor bei 23,75–23,78", () -> {
             terminalApp.checkForPause();
             String screenText = getScreenText();
             String cursor = getCursorPosition();
-            if (screenText.contains("Eingaben OK") &&
-                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"))) {
-                System.out.println("Erkannt. Sende Enter.");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(1000);
+            return screenText.contains("Eingaben OK") &&
+                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"));
+        });
+
+        if (!okErkannt) throw new IOException("Timeout beim Warten auf finalen Eingaben-OK-Prompt");
+
+        System.out.println("Erkannt. Sende Enter.");
+        sendDataWithDelay("\r");
+    }
+
+
+    private void finalPosNrEnter() throws IOException, InterruptedException {
+        System.out.println("Warte auf Rückkehr zur Startseite oder auf 'Pos-Nr.:' bei 23,62.");
+
+        boolean zielErreicht = waitUntil("Startseite (3,11 / 3,24) oder 'Pos-Nr.:' bei 23,62", () -> {
+            terminalApp.checkForPause();
+            String cursor = getCursorPosition();
+            String screenText = getScreenText();
+
+            boolean startseite = cursor.equals("3,11") || cursor.equals("3,24");
+            boolean posNrErkannt = screenTextDetector.isPosNrDisplayed()
+                    && cursor.equals("23,62")
+                    && screenText.contains("Pos-Nr.:");
+
+            return startseite || posNrErkannt;
+        });
+
+        if (!zielErreicht) throw new IOException("Timeout beim Warten auf Rückkehr oder 'Pos-Nr.:'");
+
+        String cursor = getCursorPosition();
+        getScreenText();
+
+        if (cursor.equals("3,11") || cursor.equals("3,24")) {
+            System.out.println("Zurück auf der Startseite erkannt. Überspringe.");
+        } else {
+            System.out.println("Erkannte Positionsanzeige. Sende Enter.");
+            sendDataWithDelay("\r");
         }
     }
 
-    private void finalPosNrEnter() throws IOException, InterruptedException {
-        while (true) {
-            terminalApp.checkForPause();
-            String cursor = getCursorPosition();
-            String screenText = getScreenText();
-            if (cursor.equals("3,11") || cursor.equals("3,24")) {
-                System.out.println("Zurück auf der Startseite erkannt. Überspringe.");
-                break;
-            }
-            if (screenTextDetector.isPosNrDisplayed() &&
-                    cursor.equals("23,62") && screenText.contains("Pos-Nr.:")) {
-                System.out.println("Erkannte Positionsanzeige. Sende Enter.");
-                sendDataWithDelay("\r");
-                break;
-            }
-            Thread.sleep(1000);
-        }
-    }
     private String getScreenText() {
         try {
             java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");
@@ -471,18 +545,24 @@ public class DeliveryDateProcessor {
 
     private boolean waitForPositionPrompt() throws InterruptedException {
         System.out.println("Warte auf Bildschirm für Positionsnummer-Eingabe.");
-        while (true) {
+
+        boolean erkannt = waitUntil("Cursor = 4,11 & Text enthält 'Pos.'", () -> {
             terminalApp.checkForPause();
             String currentCursor = getCursorPosition();
             String screenText = getScreenText();
             System.out.println("[DEBUG] Aktueller Cursor bei Positions-Eingabe: " + currentCursor);
-            if (currentCursor.equals("4,11") && screenText.contains("Pos.")) {
-                System.out.println("Eingabeaufforderung für Positionsnummer erkannt.");
-                return true;
-            }
-            Thread.sleep(50);
+            return currentCursor.equals("4,11") && screenText.contains("Pos.");
+        });
+
+        if (erkannt) {
+            System.out.println("Eingabeaufforderung für Positionsnummer erkannt.");
+            return true;
+        } else {
+            System.out.println("Timeout beim Warten auf Positions-Eingabe.");
+            return false;
         }
     }
+
 
 
     private void navigateToStartPage() throws IOException, InterruptedException {
@@ -492,19 +572,22 @@ public class DeliveryDateProcessor {
         final int maxAttempts = 2;
 
         while (true) {
+            terminalApp.checkForPause();
             String cursorBefore = getCursorPosition();
+            String screenBefore = getScreenText();
 
             if (cursorBefore.equals(STARTUP_CURSOR) &&
-                    (getScreenText().contains("Auf-Nr.:") || getScreenText().contains("LB-Nr.:"))) {
+                    (screenBefore.contains("Auf-Nr.:") || screenBefore.contains("LB-Nr.:"))) {
                 System.out.println("Startseite erreicht.");
                 break;
             }
 
             // Sonderfall: direkt auf "Programm - Nr." Bildschirm
-            if (cursorBefore.equals("3,24") && getScreenText().contains("Programm - Nr.:")) {
+            if (cursorBefore.equals("3,24") && screenBefore.contains("Programm - Nr.:")) {
                 System.out.println("Navigation: Bildschirm zeigt 'Programm - Nr.:'. Sende '5.0321'.");
                 String snapshotBefore = captureRelevantScreenPart();
                 sendDataWithDelay("5.0321\r");
+
                 if (hasRelevantScreenChanged(snapshotBefore, cursorBefore)) {
                     noChangeCounter = 0;
                     continue;
@@ -514,12 +597,12 @@ public class DeliveryDateProcessor {
                 }
             }
 
-            // Schritt 1: OS senden
+            // Schritt: OS senden
             String snapshotBeforeOS = captureRelevantScreenPart();
             System.out.println("Sende '\u001BOQ'");
             sendDataWithDelay("\u001BOQ");
-            boolean changedAfterOS = hasRelevantScreenChanged(snapshotBeforeOS, cursorBefore);
-            if (changedAfterOS) {
+
+            if (hasRelevantScreenChanged(snapshotBeforeOS, cursorBefore)) {
                 noChangeCounter = 0;
                 continue;
             } else {
@@ -527,17 +610,25 @@ public class DeliveryDateProcessor {
                 noChangeCounter++;
             }
 
-            // Только если OS вызвало изменения — пробуем OQ
-
             if (noChangeCounter >= maxAttempts) {
                 System.out.println("[WARNUNG] Keine Reaktion nach " + maxAttempts + " Versuchen. Warte auf manuelle Änderung...");
-                Thread.sleep(1000);
+
+                boolean weiter = waitUntil("Startseite erscheint nach manuellem Eingreifen", () -> {
+                    String cursor = getCursorPosition();
+                    String screen = getScreenText();
+                    return cursor.equals(STARTUP_CURSOR) && (screen.contains("Auf-Nr.:") || screen.contains("LB-Nr.:"));
+                });
+
+                if (weiter) {
+                    System.out.println("Startseite manuell erreicht.");
+                    break;
+                }
+
                 noChangeCounter = 0;
             }
-
-            Thread.sleep(50);
         }
     }
+
 
 
 
@@ -641,5 +732,49 @@ public class DeliveryDateProcessor {
     private String getUserCommentTemplate() {
         return terminalApp.getCommentText();
     }
+
+    private enum AusloeserStatus {
+        BITTE_AUSLOESEN,
+        EINGABEN_OK,
+        INTERNE_EINGABE,
+        NICHTS
+    }
+
+    private AusloeserStatus waitForAusloeserOderAlternative() throws InterruptedException {
+        System.out.println("Warte auf 'Bitte ausloesen !' oder alternative Zustände...");
+
+        final AtomicReference<AusloeserStatus> status = new AtomicReference<>(AusloeserStatus.NICHTS);
+
+        boolean erkannt = waitUntil("Bitte ausloesen oder Alternativen", () -> {
+            terminalApp.checkForPause();
+            String cursor = getCursorPosition();
+            String screenText = getScreenText();
+
+            if (cursor.equals("24,80") && screenText.contains("Bitte ausloesen !")) {
+                status.set(AusloeserStatus.BITTE_AUSLOESEN);
+                return true;
+            }
+
+            if (screenText.contains("Eingaben OK") &&
+                    (cursor.equals("23,75") || cursor.equals("23,76") || cursor.equals("23,77") || cursor.equals("23,78"))) {
+                status.set(AusloeserStatus.EINGABEN_OK);
+                return true;
+            }
+
+            if (cursor.equals("22,2") && screenText.contains("Interner Text")) {
+                status.set(AusloeserStatus.INTERNE_EINGABE);
+                return true;
+            }
+
+            return false;
+        });
+
+        return erkannt ? status.get() : AusloeserStatus.NICHTS;
+    }
+
+
+
+
+
 
 }

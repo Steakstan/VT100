@@ -48,7 +48,7 @@ public class CustomTerminalWindow {
         terminalCanvas.setFocusTraversable(true);
 
         HBox topBar = createTopBar();
-        OptionalMenuBar optionalMenuBar = new OptionalMenuBar(primaryStage, terminalApp);
+        OptionalMenuBar optionalMenuBar = new OptionalMenuBar( terminalApp);
         optionalMenuBar.getStyleClass().add("optional-menu-topbar");
 
         VBox topContainer = new VBox(topBar, optionalMenuBar);
