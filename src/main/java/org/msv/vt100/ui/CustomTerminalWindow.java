@@ -14,7 +14,7 @@ import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.ScreenBuffer;
 
-import java.net.URL;
+import java.util.Objects;
 
 public class CustomTerminalWindow {
 
@@ -69,10 +69,10 @@ public class CustomTerminalWindow {
 
         // ✅ Подключаем все нужные CSS-модули
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/menu.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/tabs.css").toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/menu.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/tabs.css")).toExternalForm()
         );
 
         scene.focusOwnerProperty().addListener((obs, oldVal, newVal) -> {
@@ -80,7 +80,7 @@ public class CustomTerminalWindow {
                     newVal instanceof TextInputControl ||
                     newVal instanceof ComboBoxBase ||
                     (newVal != null && newVal.getStyleClass().contains("combo-box-popup")))) {
-                Platform.runLater(() -> terminalCanvas.requestFocus());
+                Platform.runLater(terminalCanvas::requestFocus);
             }
         });
 
@@ -139,7 +139,7 @@ public class CustomTerminalWindow {
         HBox bottomBar = new HBox();
         bottomBar.getStyleClass().add("bottom-bar");
         bottomBar.setPrefHeight(BOTTOM_BAR_HEIGHT);
-        contentPanel = new ContentPanel(primaryStage, terminalApp);
+        contentPanel = new ContentPanel( terminalApp);
         contentPanel.setPrefHeight(BOTTOM_BAR_HEIGHT);
         bottomBar.getChildren().add(contentPanel);
         return bottomBar;

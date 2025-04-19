@@ -3,12 +3,8 @@ package org.msv.vt100.ui;
 import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -38,9 +34,9 @@ public class OptionalMenuBar extends HBox {
         Button btnBearbeiten = createMenuButton("Bearbeiten");
         Button btnLog = createMenuButton("Log");
 
-        btnDatei.setOnAction(e -> togglePopup(btnDatei, primaryStage));
-        btnBearbeiten.setOnAction(e -> togglePopup(btnBearbeiten, primaryStage));
-        btnLog.setOnAction(e -> togglePopup(btnLog, primaryStage));
+        btnDatei.setOnAction(e -> togglePopup(btnDatei));
+        btnBearbeiten.setOnAction(e -> togglePopup(btnBearbeiten));
+        btnLog.setOnAction(e -> togglePopup(btnLog));
 
         setupHoverToggle(btnDatei, primaryStage);
         setupHoverToggle(btnBearbeiten, primaryStage);
@@ -59,12 +55,12 @@ public class OptionalMenuBar extends HBox {
     private void setupHoverToggle(Button button, Stage stage) {
         button.setOnMouseEntered(e -> {
             if (currentPopup != null && currentPopupButton != button) {
-                togglePopup(button, stage);
+                togglePopup(button);
             }
         });
     }
 
-    private void togglePopup(Button button, Stage stage) {
+    private void togglePopup(Button button) {
         if (currentPopup != null && currentPopupButton == button) {
             closePopup();
         } else {
@@ -73,17 +69,17 @@ public class OptionalMenuBar extends HBox {
             switch (button.getText()) {
                 case "Datei" -> currentPopup = createPopupMenu(
                         new MenuEntry[]{
-                                new MenuEntry("⚙ Verbindung Einstellungen", () -> terminalApp.openProfileDialog()),
-                                new MenuEntry("🔄 Verbindung neu starten", () -> terminalApp.restartConnection()),
-                                new MenuEntry("🔐 Login‑Einstellungen", () -> terminalApp.openLoginSettingsDialog()),
+                                new MenuEntry("⚙ Verbindung Einstellungen", terminalApp::openProfileDialog),
+                                new MenuEntry("🔄 Verbindung neu starten", terminalApp::restartConnection),
+                                new MenuEntry("🔐 Login‑Einstellungen", terminalApp::openLoginSettingsDialog),
                                 MenuEntry.separator(),
-                                new MenuEntry("⛔ Verbindung abfallen", () -> terminalApp.disconnectConnection())
+                                new MenuEntry("⛔ Verbindung abfallen", terminalApp::disconnectConnection)
                         });
 
                 case "Bearbeiten" -> currentPopup = createPopupMenu(
                         new MenuEntry[]{
-                                new MenuEntry("📝 Bearbeitungseinstellungen", () -> terminalApp.openBearbeitungseinstellungenDialog()),
-                                new MenuEntry("🔍 Positionssuche", () -> terminalApp.openPositionssucheDialog())
+                                new MenuEntry("📝 Bearbeitungseinstellungen", terminalApp::openBearbeitungseinstellungenDialog),
+                                new MenuEntry("🔍 Positionssuche", terminalApp::openPositionssucheDialog)
                         });
 
                 case "Log" -> currentPopup = createPopupMenu(

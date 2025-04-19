@@ -5,7 +5,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -14,24 +13,27 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.msv.vt100.TerminalApp;
 import org.msv.vt100.ssh.SSHConfig;
 import org.msv.vt100.ssh.SSHProfileManager;
+import org.msv.vt100.util.DialogHelper;
 
 import java.io.File;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public class ProfileManagerDialog {
 
     private final Stage dialog;
-    private final BorderPane root;
     private final TabPane tabPane;
     private final Tab profilesTab;
     private final Tab settingsTab;
     private final TableView<SSHConfig> profileTable;
     private final ToggleGroup autoConnectToggleGroup;
+    private  final TerminalApp terminalApp;
 
     private TextField userField;
     private TextField hostField;
@@ -41,7 +43,8 @@ public class ProfileManagerDialog {
     private SSHConfig editingProfile = null;
     private SSHConfig selectedProfile = null;
 
-    public ProfileManagerDialog(Stage owner) {
+    public ProfileManagerDialog(Stage owner, TerminalApp terminalApp) {
+        this.terminalApp = terminalApp;
         dialog = new Stage();
         dialog.initOwner(owner);
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -83,31 +86,7 @@ public class ProfileManagerDialog {
         TableColumn<SSHConfig, String> hostCol = new TableColumn<>("Verbindung");
         hostCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().host()));
 
-        TableColumn<SSHConfig, Boolean> autoCol = new TableColumn<>("Automatische Verbindung");
-        autoCol.setCellFactory(col -> new TableCell<>() {
-            private final RadioButton radio = new RadioButton();
-            {
-                radio.setToggleGroup(autoConnectToggleGroup);
-                radio.setOnAction(e -> SSHProfileManager.updateProfile(
-                        new SSHConfig(
-                                getTableView().getItems().get(getIndex()).user(),
-                                getTableView().getItems().get(getIndex()).host(),
-                                getTableView().getItems().get(getIndex()).port(),
-                                getTableView().getItems().get(getIndex()).privateKeyPath(),
-                                true
-                        )));
-            }
-            @Override
-            protected void updateItem(Boolean item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    radio.setSelected(getTableView().getItems().get(getIndex()).autoConnect());
-                    setGraphic(radio);
-                }
-            }
-        });
+        TableColumn<SSHConfig, Boolean> autoCol = getSshConfigBooleanTableColumn();
 
         TableColumn<SSHConfig, String> dateCol = new TableColumn<>("Letzte Verbindung");
         dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))));
@@ -188,7 +167,7 @@ public class ProfileManagerDialog {
         tabPane.getTabs().addAll(profilesTab, settingsTab);
         tabPane.getSelectionModel().select(profilesTab);
 
-        root = new BorderPane();
+        BorderPane root = new BorderPane();
         root.setTop(header);
         root.setCenter(tabPane);
         root.getStyleClass().add("root-dialog");
@@ -201,16 +180,47 @@ public class ProfileManagerDialog {
         Scene scene = new Scene(root, 850, 400);
         scene.setFill(Color.TRANSPARENT);
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/contextmenu.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/listview.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/menu.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/tabs.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/table.css").toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/contextmenu.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/listview.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/menu.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/tabs.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/table.css")).toExternalForm()
         );
         dialog.setScene(scene);
+        DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
+        DialogHelper.enableDragging(dialog, header);
+    }
+
+    private TableColumn<SSHConfig, Boolean> getSshConfigBooleanTableColumn() {
+        TableColumn<SSHConfig, Boolean> autoCol = new TableColumn<>("Automatische Verbindung");
+        autoCol.setCellFactory(col -> new TableCell<>() {
+            private final RadioButton radio = new RadioButton();
+            {
+                radio.setToggleGroup(autoConnectToggleGroup);
+                radio.setOnAction(e -> SSHProfileManager.updateProfile(
+                        new SSHConfig(
+                                getTableView().getItems().get(getIndex()).user(),
+                                getTableView().getItems().get(getIndex()).host(),
+                                getTableView().getItems().get(getIndex()).port(),
+                                getTableView().getItems().get(getIndex()).privateKeyPath(),
+                                true
+                        )));
+            }
+            @Override
+            protected void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    radio.setSelected(getTableView().getItems().get(getIndex()).autoConnect());
+                    setGraphic(radio);
+                }
+            }
+        });
+        return autoCol;
     }
 
     private void updateProfileList() {
@@ -280,7 +290,8 @@ public class ProfileManagerDialog {
                 updateProfileList();
                 tabPane.getSelectionModel().select(profilesTab);
             } catch (NumberFormatException ex) {
-                new Alert(Alert.AlertType.ERROR, "Port muss eine Zahl sein").showAndWait();
+                TerminalDialog.showError("Port muss eine Zahl sein.", terminalApp.getUIController().getPrimaryStage());
+
             }
         });
 
@@ -321,7 +332,8 @@ public class ProfileManagerDialog {
         return Optional.ofNullable(selectedProfile);
     }
 
-    public static Optional<SSHConfig> showDialog(Stage owner) {
-        return new ProfileManagerDialog(owner).showAndWait();
+    public static Optional<SSHConfig> showDialog(Stage owner, TerminalApp terminalApp) {
+        return new ProfileManagerDialog(owner, terminalApp).showAndWait();
     }
+
 }

@@ -13,6 +13,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
+import org.msv.vt100.util.DialogHelper;
 
 import java.io.File;
 import java.util.Objects;
@@ -144,12 +145,14 @@ public class PositionssucheDialog {
 
         // Modular CSS laden
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css").toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css")).toExternalForm()
         );
 
         dialog.setScene(scene);
+        DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
+        DialogHelper.enableDragging(dialog, header);
     }
 
     private void startSearch() {
@@ -158,14 +161,14 @@ public class PositionssucheDialog {
         String firmNumbers = firmNumbersField.getText().trim();
 
         if (orderPath.isEmpty() || terminalPath.isEmpty() || firmNumbers.isEmpty()) {
-            showAlert(Alert.AlertType.ERROR, "Bitte füllen Sie alle Felder aus.");
+            TerminalDialog.showError("Bitte füllen Sie alle Felder aus.", terminalApp.getUIController().getPrimaryStage());
             return;
         }
 
         String[] firms = firmNumbers.split(",");
         for (String firm : firms) {
             if (!firm.trim().matches("\\d{4}")) {
-                showAlert(Alert.AlertType.ERROR, "Firmennummern müssen vierstellige Zahlen sein.");
+                TerminalDialog.showError("Firmennummern müssen vierstellige Zahlen sein.", terminalApp.getUIController().getPrimaryStage());
                 return;
             }
         }
@@ -182,17 +185,15 @@ public class PositionssucheDialog {
 
         dialog.close();
 
-        processor.startSearch(() -> showAlert(Alert.AlertType.INFORMATION, "Positionssuche abgeschlossen."));
-    }
-
-    private void showAlert(Alert.AlertType type, String message) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(type, message, ButtonType.OK);
-            alert.showAndWait();
-        });
+        processor.startSearch(() -> TerminalDialog.showInfo("Positionssuche abgeschlossen.", terminalApp.getUIController().getPrimaryStage()));
     }
 
     public void show() {
-        Platform.runLater(() -> dialog.showAndWait());
+        dialog.setOnShowing(event ->
+                DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage())
+        );
+        Platform.runLater(dialog::show);
     }
+
+
 }

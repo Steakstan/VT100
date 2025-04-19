@@ -1,6 +1,5 @@
 package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.ansiisequences.LeftRightMarginModeHandler;
 import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.core.Cell;
 import org.msv.vt100.core.Cursor;

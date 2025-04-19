@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 package org.msv.vt100.ansiisequences;
 
 import org.slf4j.Logger;

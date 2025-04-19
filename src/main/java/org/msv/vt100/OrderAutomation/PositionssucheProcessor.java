@@ -1,8 +1,6 @@
 package org.msv.vt100.OrderAutomation;
 
 import javafx.application.Platform;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -16,6 +14,7 @@ import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.Cursor;
 import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.ssh.SSHManager;
+import org.msv.vt100.ui.TerminalDialog;
 import org.msv.vt100.util.CellValueExtractor;
 
 import java.io.FileInputStream;
@@ -32,7 +31,6 @@ public class PositionssucheProcessor {
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
     private final SSHManager sshManager;
-    private DeferredMatch deferredMatch;
 
     public PositionssucheProcessor(String orderFilePath, String outputFilePath, String userNumber,
                                    TerminalApp terminalApp, ScreenBuffer screenBuffer, Cursor cursor) {
@@ -48,7 +46,7 @@ public class PositionssucheProcessor {
     public void startSearch(Runnable onCompletion) {
         new Thread(() -> {
             try {
-                Platform.runLater(() -> terminalApp.showProcessingButtons());
+                Platform.runLater(terminalApp::showProcessingButtons);
                 search();
                 Platform.runLater(() -> {
                     terminalApp.hideProcessingButtons();
@@ -58,8 +56,7 @@ public class PositionssucheProcessor {
                 ex.printStackTrace();
                 Platform.runLater(() -> {
                     terminalApp.hideProcessingButtons();
-                    Alert alert = new Alert(Alert.AlertType.ERROR, "Fehler bei der Positionssuche: " + ex.getMessage(), ButtonType.OK);
-                    alert.showAndWait();
+                    TerminalDialog.showError("Fehler bei der Positionssuche: " + ex.getMessage(), terminalApp.getUIController().getPrimaryStage());
                 });
             }
         }, "PositionssucheProcessorThread").start();
@@ -149,63 +146,9 @@ public class PositionssucheProcessor {
             while (!finished) {
                 terminalApp.checkForPause();
                 if (terminalApp.isStopped()) return;
-                deferredMatch = null;
                 resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                 sendDataWithDelay("\r");
                 Thread.sleep(150);
-                if (deferredMatch != null) {
-                    String key = deferredMatch.firm + "_" + deferredMatch.position;
-                    if (!processedRowsForOrder.containsKey(key)) {
-                        String newFirmCheck = CellValueExtractor.extractCells(screenBuffer, 21, 4, 5, 6, 7);
-                        String newPosition = CellValueExtractor.extractCells(screenBuffer, 21, 0, 1, 2, 3);
-                        String modelNumber;
-                        if (newFirmCheck.equals(deferredMatch.firm) && newPosition.equals(deferredMatch.position)) {
-                            modelNumber = CellValueExtractor.extractCells(screenBuffer, 22, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                        } else {
-                            String firmRow7 = CellValueExtractor.extractCells(screenBuffer, 7, 4, 5, 6, 7);
-                            if (firmRow7 != null && !firmRow7.isEmpty()) {
-                                String positionRow7 = CellValueExtractor.extractCells(screenBuffer, 7, 0, 1, 2, 3);
-                                if (positionRow7.equals(deferredMatch.position)) {
-                                    modelNumber = CellValueExtractor.extractCells(screenBuffer, 8, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                                } else {
-                                    modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                                }
-                            } else {
-                                modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-                            }
-                        }
-                        String abLiefertermin;
-                        if (newFirmCheck != null && !newFirmCheck.isEmpty() && newFirmCheck.equals(deferredMatch.firm)) {
-                            abLiefertermin = CellValueExtractor.extractCells(screenBuffer, 21, 55, 56, 57, 58);
-                        } else {
-                            abLiefertermin = CellValueExtractor.extractCells(screenBuffer, 7, 55, 56, 57, 58);
-                        }
-                        Row resultRow = resultSheet.createRow(resultRowIndex++);
-                        Cell rCell0 = resultRow.createCell(0);
-                        rCell0.setCellValue(deferredMatch.firm);
-                        rCell0.setCellStyle(defaultCellStyle);
-                        Cell rCell1 = resultRow.createCell(1);
-                        rCell1.setCellValue(order);
-                        rCell1.setCellStyle(defaultCellStyle);
-                        Cell rCell2 = resultRow.createCell(2);
-                        rCell2.setCellValue(deferredMatch.position);
-                        rCell2.setCellStyle(defaultCellStyle);
-                        Cell rCell3 = resultRow.createCell(3);
-                        rCell3.setCellValue(deferredMatch.modelDescription);
-                        rCell3.setCellStyle(defaultCellStyle);
-                        Cell rCell4 = resultRow.createCell(4);
-                        rCell4.setCellValue(modelNumber);
-                        rCell4.setCellStyle(defaultCellStyle);
-                        Cell rCell5 = resultRow.createCell(5);
-                        rCell5.setCellValue(deferredMatch.deliveryDate);
-                        rCell5.setCellStyle(defaultCellStyle);
-                        Cell rCell6 = resultRow.createCell(6);
-                        rCell6.setCellValue(abLiefertermin);
-                        rCell6.setCellStyle(defaultCellStyle);
-                        processedRowsForOrder.put(key, resultRow);
-                    }
-                    deferredMatch = null;
-                }
                 String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
                     resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
@@ -259,32 +202,33 @@ public class PositionssucheProcessor {
                     if (cellFirm.equals(firm)) {
                         String position = CellValueExtractor.extractCells(buffer, line, 0, 1, 2, 3);
                         String key = firm + "_" + position;
-                        if (!processedRows.containsKey(key)) {
+                        Row existingRow = processedRows.get(key);
+                        if (existingRow == null) {
                             Row newRow = resultSheet.createRow(resultRowIndex++);
                             processedRows.put(key, newRow);
 
                             if (line == 22) {
-                                // Записать строку 22
                                 writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
-
-                                // Переход на новую страницу
                                 performPageTransition();
-                                Thread.sleep(200); // Ждём обновления экрана
-
-                                // Чтение modelNumber после перехода
+                                Thread.sleep(200);
                                 String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
                                 Cell cellModel = newRow.createCell(4);
                                 cellModel.setCellValue(modelNumber);
                                 cellModel.setCellStyle(defaultCellStyle);
-
-                                // Отмечаем, что мы перешли страницу — начать новую итерацию while
                                 pageTransitioned = true;
                                 break;
                             } else {
-                                // Обычная строка
                                 writeNormalRow(newRow, buffer, line, defaultCellStyle, firm, order, position);
                             }
+                        } else {
+                            // обновление существующей строки
+                            if (line == 22) {
+                                updateRow22(existingRow, buffer, defaultCellStyle);
+                            } else {
+                                updateNormalRow(existingRow, buffer, line, defaultCellStyle);
+                            }
                         }
+
                     }
                 }
 

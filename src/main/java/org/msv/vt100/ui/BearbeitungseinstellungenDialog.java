@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -13,6 +14,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
+import org.msv.vt100.util.DialogHelper;
 
 import java.io.File;
 
@@ -35,7 +37,6 @@ public class BearbeitungseinstellungenDialog {
     }
 
     private void initUI() {
-        // Header
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -51,7 +52,6 @@ public class BearbeitungseinstellungenDialog {
 
         header.getChildren().addAll(titleLabel, spacer, closeButton);
 
-        // Inhalt
         GridPane grid = new GridPane();
         grid.getStyleClass().add("dialog-grid");
         grid.setHgap(10);
@@ -62,13 +62,45 @@ public class BearbeitungseinstellungenDialog {
         operationLabel.getStyleClass().add("dialog-label-turquoise");
 
         operationComboBox = new ComboBox<>();
+        operationComboBox.setCellFactory(listView -> {
+            // ← Форсируем белый цвет
+            return new ListCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                        setTextFill(Color.WHITE); // ← Форсируем белый цвет
+                    }
+                }
+            };
+        });
+
+// Форсируем цвет выбранного элемента (отображается в закрытом состоянии ComboBox)
+        operationComboBox.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    setTextFill(Color.WHITE); // ← тоже белый
+                }
+            }
+        });
+
+
         operationComboBox.getItems().addAll(
-                "AB-Verarbeitung",
-                "Kommentare verarbeiten",
-                "Kommentare für Lagerbestellung verarbeiten",
-                "Liefertermine verarbeiten"
+                "Liefertermine und AB-Nummern",
+                "Kommentare verarbeiten"
         );
-        operationComboBox.getSelectionModel().selectFirst();
+        operationComboBox.getSelectionModel().select(0);
+        operationComboBox.getStyleClass().add("custom-combobox");
+        operationComboBox.setPrefWidth(300);
+        operationComboBox.setPrefHeight(30);
 
         Label fileLabel = new Label("Datei auswählen:");
         fileLabel.getStyleClass().add("dialog-label-turquoise");
@@ -91,20 +123,49 @@ public class BearbeitungseinstellungenDialog {
         HBox fileBox = new HBox(5, filePathField, browseButton);
         fileBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Kommentar aktivieren
         commentCheckBox = new CheckBox("Kommentar schreiben");
-        commentCheckBox.setSelected(true);
+        commentCheckBox.setSelected(false);
+        commentCheckBox.getStyleClass().add("dialog-label-turquoise");
 
         Label commentLabel = new Label("Kommentartext:");
         commentLabel.getStyleClass().add("dialog-label-turquoise");
 
-        commentField = new TextField("DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT");
+        commentField = new TextField();
+        commentField.setPromptText("Kommentar eingeben...");
         commentField.getStyleClass().add("dialog-text-field");
+        commentField.setDisable(true);
+        commentField.setPrefWidth(300);
+        commentField.setPrefHeight(30);
+        commentField.addEventFilter(KeyEvent.KEY_TYPED, event -> {
+            if (commentField.getText().length() >= 49) {
+                event.consume();
+            }
+        });
 
-        VBox commentBox = new VBox(5, commentCheckBox, commentLabel, commentField);
+        Tooltip commentTooltip = new Tooltip("Maximal 49 Zeichen erlaubt.\n\"**\" steht für das Lieferdatum aus der Tabelle.");
+        commentTooltip.getStyleClass().add("custom-tooltip");
+
+        Label questionIcon = new Label("?");
+        questionIcon.getStyleClass().add("tooltip-icon");
+        questionIcon.setAlignment(Pos.CENTER);
+        Tooltip.install(questionIcon, commentTooltip);
+
+        HBox commentInputBox = new HBox(5, commentField, questionIcon);
+        commentInputBox.setAlignment(Pos.CENTER_LEFT);
+
+        commentCheckBox.setOnAction(e -> {
+            boolean active = commentCheckBox.isSelected();
+            commentField.setDisable(!active);
+            questionIcon.setDisable(!active); // ← добавить это
+            if (active && (commentField.getText().isEmpty() || commentField.getText().isBlank())) {
+                commentField.setText("DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT");
+            }
+        });
+
+        VBox commentBox = new VBox(5, commentCheckBox, commentLabel, commentInputBox);
+        commentBox.getStyleClass().add("comment-box-background");
         commentBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Buttons
         Button startButton = new Button("Verarbeitung starten");
         startButton.getStyleClass().add("dialog-button");
         startButton.setOnAction(e -> startProcessing());
@@ -116,7 +177,6 @@ public class BearbeitungseinstellungenDialog {
         HBox buttonBox = new HBox(10, startButton, cancelButton);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
 
-        // Вставка элементов в сетку
         grid.add(operationLabel, 0, 0);
         grid.add(operationComboBox, 1, 0);
         grid.add(fileLabel, 0, 1);
@@ -124,37 +184,53 @@ public class BearbeitungseinstellungenDialog {
         grid.add(commentBox, 1, 2);
         grid.add(buttonBox, 1, 3);
 
-        // Корневой контейнер
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);
         root.setCenter(grid);
 
-        Rectangle clip = new Rectangle(500, 260);
+        Rectangle clip = new Rectangle(530, 300);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
         root.setClip(clip);
 
-        Scene scene = new Scene(root, 500, 260);
+        Scene scene = new Scene(root, 530, 300);
         scene.setFill(Color.TRANSPARENT);
 
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css").toExternalForm()
+                safeStylesheet("/org/msv/vt100/ui/styles/base.css"),
+                safeStylesheet("/org/msv/vt100/ui/styles/buttons.css"),
+                safeStylesheet("/org/msv/vt100/ui/styles/dialogs.css"),
+                safeStylesheet("/org/msv/vt100/ui/styles/combobox.css"),
+                safeStylesheet("/org/msv/vt100/ui/styles/tooltip.css")
         );
 
         dialog.setScene(scene);
+        DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
+        DialogHelper.enableDragging(dialog, header); // header — это HBox из заголовка
+
+
+        // Обеспечить появление Tooltip с задержкой
+        Platform.runLater(() -> commentTooltip.setStyle("-fx-show-delay: 100ms;"));
+    }
+
+    private String safeStylesheet(String path) {
+        var url = getClass().getResource(path);
+        if (url == null) {
+            System.err.println("⚠️ Stylesheet nicht gefunden: " + path);
+            return null;
+        }
+        return url.toExternalForm();
     }
 
     private void startProcessing() {
         String filePath = filePathField.getText();
         if (filePath == null || filePath.isEmpty()) {
-            new Alert(Alert.AlertType.ERROR, "Bitte wählen Sie eine Datei aus.", ButtonType.OK).showAndWait();
+            TerminalDialog.showError("Bitte wählen Sie eine Datei aus.", terminalApp.getUIController().getPrimaryStage());
             return;
         }
 
-        int choice = operationComboBox.getSelectionModel().getSelectedIndex() + 1;
+        int choice = operationComboBox.getSelectionModel().getSelectedIndex() == 0 ? 4 : 2;
         String commentText = commentField.getText();
         boolean shouldWriteComment = commentCheckBox.isSelected();
 
@@ -162,13 +238,9 @@ public class BearbeitungseinstellungenDialog {
 
         new Thread(() -> {
             try {
-                // Передаём настройки комментария в TerminalApp
                 terminalApp.setCommentText(commentText);
                 terminalApp.setShouldWriteComment(shouldWriteComment);
-
                 terminalApp.getFileProcessingService().processFile(choice, filePath);
-
-
             } catch (InterruptedException ex) {
                 Platform.runLater(() -> {
                     new Alert(Alert.AlertType.INFORMATION, "Verarbeitung gestoppt.", ButtonType.OK).showAndWait();
@@ -176,7 +248,7 @@ public class BearbeitungseinstellungenDialog {
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
-                    new Alert(Alert.AlertType.ERROR, "Fehler bei der Verarbeitung: " + ex.getMessage(), ButtonType.OK).showAndWait();
+                    TerminalDialog.showError("Bitte wählen Sie eine Datei aus.", terminalApp.getUIController().getPrimaryStage());
                     terminalApp.hideProcessingButtons();
                 });
             }
@@ -186,6 +258,12 @@ public class BearbeitungseinstellungenDialog {
     }
 
     public void show() {
-        dialog.showAndWait();
+        dialog.setOnShowing(event ->
+                DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage())
+        );
+        Platform.runLater(dialog::show);
     }
+
+
+
 }

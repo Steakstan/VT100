@@ -83,7 +83,7 @@ public class NrcsHandler {
             nrcsMapping.put('}', 'ü');
             nrcsMapping.put('~', 'ß');
             nrcsMapping.put((char) 0xB4, '´');
-            nrcsMapping.put('\u00AE', '®');
+            nrcsMapping.put('®', '®');
         }
     }
 }

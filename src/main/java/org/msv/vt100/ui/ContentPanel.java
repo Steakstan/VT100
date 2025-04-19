@@ -10,11 +10,9 @@ import org.msv.vt100.TerminalApp;
 public class ContentPanel extends BorderPane {
 
     private final HBox processingButtons;
-    private final Stage primaryStage;
     private final TerminalApp terminalApp;
 
-    public ContentPanel(Stage primaryStage, TerminalApp terminalApp) {
-        this.primaryStage = primaryStage;
+    public ContentPanel( TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
 
         processingButtons = new HBox();

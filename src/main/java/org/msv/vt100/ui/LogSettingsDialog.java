@@ -13,8 +13,10 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
+import org.msv.vt100.util.DialogHelper;
 
 import java.io.File;
+import java.util.Objects;
 import java.util.prefs.Preferences;
 
 public class LogSettingsDialog {
@@ -122,12 +124,14 @@ public class LogSettingsDialog {
         Scene scene = new Scene(root, 540, 180);
         scene.setFill(Color.TRANSPARENT);
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css").toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css")).toExternalForm()
         );
 
         dialog.setScene(scene);
+        DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
+        DialogHelper.enableDragging(dialog, header);
     }
 
     private void saveSettings() {
@@ -149,6 +153,11 @@ public class LogSettingsDialog {
     }
 
     public void show() {
-        Platform.runLater(dialog::showAndWait);
+        dialog.setOnShowing(event ->
+                DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage())
+        );
+        Platform.runLater(dialog::show);
     }
+
+
 }

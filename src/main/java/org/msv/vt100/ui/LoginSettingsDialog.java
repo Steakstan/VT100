@@ -12,10 +12,13 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.msv.vt100.TerminalApp;
 import org.msv.vt100.login.LoginProfile;
 import org.msv.vt100.login.LoginProfileManager;
+import org.msv.vt100.util.DialogHelper;
 
 import java.util.List;
+import java.util.Objects;
 
 public class LoginSettingsDialog {
 
@@ -25,8 +28,10 @@ public class LoginSettingsDialog {
     private final TextField profileNameField;
     private final TextField usernameField;
     private final PasswordField passwordField;
+    private final TerminalApp terminalApp;
 
-    public LoginSettingsDialog() {
+    public LoginSettingsDialog(TerminalApp terminalApp) {
+        this.terminalApp = terminalApp;
         dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initStyle(StageStyle.TRANSPARENT);
@@ -151,14 +156,16 @@ public class LoginSettingsDialog {
         Scene scene = new Scene(root, 900, 480);
         scene.setFill(Color.TRANSPARENT);
         scene.getStylesheets().addAll(
-                getClass().getResource("/org/msv/vt100/ui/styles/base.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/buttons.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/listview.css").toExternalForm(),
-                getClass().getResource("/org/msv/vt100/ui/styles/table.css").toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/dialogs.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/listview.css")).toExternalForm(),
+                Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/table.css")).toExternalForm()
         );
 
         dialog.setScene(scene);
+        DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
+        DialogHelper.enableDragging(dialog, header); // header — это HBox из заголовка
     }
 
     private void updateProfileList() {
@@ -194,6 +201,11 @@ public class LoginSettingsDialog {
     }
 
     public void show() {
-        Platform.runLater(dialog::showAndWait);
+        dialog.setOnShowing(event ->
+                DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage())
+        );
+        Platform.runLater(dialog::show);
     }
+
+
 }

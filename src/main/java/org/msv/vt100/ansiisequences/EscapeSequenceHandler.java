@@ -1,14 +1,5 @@
 package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.OrderAutomation.*;
-import org.msv.vt100.ansiisequences.FillRectangularAreaHandler;
-import org.msv.vt100.ansiisequences.InsertLineHandler;
-import org.msv.vt100.ansiisequences.LeftRightMarginModeHandler;
-import org.msv.vt100.ansiisequences.LeftRightMarginSequenceHandler;
-import org.msv.vt100.ansiisequences.LineAttributeHandler;
-import org.msv.vt100.ansiisequences.NrcsHandler;
-import org.msv.vt100.ansiisequences.ScrollingRegionHandler;
-import org.msv.vt100.ansiisequences.TextFormater;
 import org.msv.vt100.core.Cursor;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.ScreenBuffer;
@@ -34,12 +25,12 @@ public class EscapeSequenceHandler {
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
     private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler;
     private final DECCRASequenceHandler deccraSequenceHandler; // Новый обработчик
-    private final TerminalApp terminalApp;
     private final EraseCharacterHandler eraseCharacterHandler;
     private final FillRectangularAreaHandler fillRectangularAreaHandler;
     private final Cursor cursor;
     private final LineAttributeHandler lineAttributeHandler;
     private final InsertLineHandler insertLineHandler;
+
 
     public EscapeSequenceHandler(
             ErasingSequences erasingSequences,
@@ -53,7 +44,6 @@ public class EscapeSequenceHandler {
             CursorController cursorController,
             LeftRightMarginModeHandler leftRightMarginModeHandler,
             CopyRectangularAreaHandler copyRectangularAreaHandler,
-            TerminalApp terminalApp,
             EraseCharacterHandler eraseCharacterHandler,
             FillRectangularAreaHandler fillRectangularAreaHandler,
             Cursor cursor,
@@ -71,9 +61,10 @@ public class EscapeSequenceHandler {
         this.nrcsHandler = nrcsHandler;
         this.cursorController = cursorController;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
-        this.terminalApp = terminalApp;
         this.eraseCharacterHandler = eraseCharacterHandler;
         this.fillRectangularAreaHandler = fillRectangularAreaHandler;
+        this.fillRectangularAreaHandler.setLeftRightMarginModeHandler(leftRightMarginModeHandler);
+        this.fillRectangularAreaHandler.setScrollingRegionHandler(scrollingRegionHandler);
         this.cursor = cursor;
         this.lineAttributeHandler = lineAttributeHandler;
         this.deccraSequenceHandler = new DECCRASequenceHandler(
@@ -159,9 +150,18 @@ public class EscapeSequenceHandler {
                 break;
             default:
                 if (sequence.matches("\\[\\d+;\\d+r")) {
-                    // Set scrolling region
                     scrollingRegionHandler.setScrollingRegion(sequence);
+
+                    int top = scrollingRegionHandler.getWindowStartRow();
+                    int left = leftRightMarginModeHandler.isLeftRightMarginModeEnabled()
+                            ? leftRightMarginModeHandler.getLeftMargin()
+                            : 0;
+
+                    cursor.setPosition(top, left); // ← вот тут корректное перемещение курсора
+                    logger.info("Курсор перемещён в верхний левый угол области: row={}, col={}", top + 1, left + 1);
+                    return;
                 }
+
                 else if (sequence.matches("\\[\\d+;\\d+H")) {
                     // Handle cursor movement
                     cursorMovementHandler.handleCursorMovement(sequence);
@@ -186,9 +186,17 @@ public class EscapeSequenceHandler {
                     textFormater.handleSgrSequence(sequence);
                 }
                 else if (sequence.matches("\\[\\d+;\\d+s")) {
-                    // Установка левых и правых полей
                     leftRightMarginSequenceHandler.handleLeftRightMarginSequence(sequence);
+
+                    int top = scrollingRegionHandler.getWindowStartRow();
+                    int left = leftRightMarginModeHandler.isLeftRightMarginModeEnabled()
+                            ? leftRightMarginModeHandler.getLeftMargin()
+                            : 0;
+
+                    cursor.setPosition(top, left);  // <-- Добавь это!
+                    logger.info("Курсор перемещён в верхний левый угол после установки полей: row={}, col={}", top + 1, left + 1);
                 }
+
                 else if (sequence.matches("\\[([0-9;]*?)\\$v")) {
                     // Обработка DECCRA
                     deccraSequenceHandler.handleDECCRA(sequence);

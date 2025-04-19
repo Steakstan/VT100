@@ -24,7 +24,6 @@ public class InputHandler {
     private static final Logger logger = LoggerFactory.getLogger(InputHandler.class);
 
     private final TerminalApp terminalApp;
-    private final SSHManager sshConnector;
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
 
@@ -32,13 +31,11 @@ public class InputHandler {
      * Constructs an InputHandler with the given TerminalApp, SSHManager, ScreenBuffer, and Cursor.
      *
      * @param terminalApp  the main terminal application.
-     * @param sshConnector the SSH manager for sending data.
      * @param screenBuffer the screen buffer.
      * @param cursor       the terminal cursor.
      */
-    public InputHandler(TerminalApp terminalApp, SSHManager sshConnector, ScreenBuffer screenBuffer, Cursor cursor) {
+    public InputHandler(TerminalApp terminalApp, ScreenBuffer screenBuffer, Cursor cursor) {
         this.terminalApp = terminalApp;
-        this.sshConnector = sshConnector;
         this.screenBuffer = screenBuffer;
         this.cursor = cursor;
     }

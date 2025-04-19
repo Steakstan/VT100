@@ -1,0 +1,59 @@
+.combo-box.custom-combobox {
+    -fx-background-color: rgb(2, 23, 28);
+    -fx-border-color: white;
+    -fx-border-width: 1;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-text-fill: white;
+    -fx-pref-width: 300;
+    -fx-pref-height: 30;
+    -fx-font-size: 13px;
+    -fx-padding: 2 8 2 8;
+}
+
+.combo-box.custom-combobox .arrow-button {
+    -fx-background-color: transparent;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: rgb(0, 43, 54); /* немного мягче */
+    -fx-border-color: rgba(255,255,255,0.4); /* менее агрессивная белая */
+    -fx-border-radius: 5;
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-padding: 6 10;
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+.combo-box .label {
+    -fx-text-fill: white !important;
+    -fx-opacity: 1.0;
+}
+
+.comment-box-background {
+    -fx-background-color: rgba(255,255,255,0.03);
+    -fx-border-color: rgba(255,255,255,0.1);
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 10;
+}
+.combo-box .label {
+    -fx-text-fill: white !important;
+    -fx-opacity: 1.0;
+}
+
+.combo-box:focused .label {
+    -fx-text-fill: white !important;
+}
+
+.combo-box:editable .text-field {
+    -fx-text-fill: white;
+}

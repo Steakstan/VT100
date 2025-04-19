@@ -13,7 +13,7 @@
 }
 
 .dialog-grid {
-    -fx-background-color: rgb(0, 43, 54);
+    -fx-background-color: linear-gradient(to bottom right, rgba(7, 54, 66, 0.95), rgba(0, 43, 54, 0.95));
     -fx-background-radius: 0 0 15 15;     /* Верхние углы прямые, нижние скруглённые */
     -fx-border-color: rgb(2, 23, 28);
     -fx-border-width: 1;
@@ -35,3 +35,16 @@
     -fx-background-radius: 5;
     -fx-pref-width: 300;
 }
+
+.dialog-button:hover {
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+    -fx-background-color: white;
+    -fx-text-fill: rgb(28, 151, 181);
+}
+
+.root-dialog {
+    -fx-background-color: transparent;
+}
+
+

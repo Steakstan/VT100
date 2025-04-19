@@ -52,7 +52,6 @@ public class TerminalApp extends Application {
     private ScreenTextDetector screenTextDetector;
     private InputProcessor inputProcessor;
     private UIController uiController;
-    private CustomTerminalWindow customTerminalWindow;
     private SSHConfig currentProfile;
     private String commentText = "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
     private boolean shouldWriteComment = true;
@@ -63,13 +62,12 @@ public class TerminalApp extends Application {
     // Process control flags
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
-    private final ReentrantLock pauseLock = new ReentrantLock();
     private final Object pauseCondition = new Object();
     private FileProcessingService fileProcessingService;
-    private Thread processingThread;
+    Thread processingThread;
 
     // Logging flag
-    private boolean isLoggingEnabled = false;
+     boolean isLoggingEnabled = false;
 
     /**
      * The start method initializes the SSH connection, terminal components, UI, and file processing service.
@@ -100,13 +98,13 @@ public class TerminalApp extends Application {
      * If none exists, it shows the profile selection dialog.
      */
     private void initializeSSHManager() {
-        List<SSHConfig> profiles = SSHProfileManager.getProfiles();
         SSHConfig autoProfile = SSHProfileManager.getAutoConnectProfile();
         if (autoProfile != null) {
             connectWithConfig(autoProfile);
         } else {
             // Show the profile dialog with the main window as owner
-            Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
+            Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage(), this);
+
             chosen.ifPresent(this::connectWithConfig);
         }
     }
@@ -183,8 +181,7 @@ public class TerminalApp extends Application {
         EscapeSequenceHandler escapeSequenceHandler = new EscapeSequenceHandler(
                 erasingSequences, cursorMovementHandler, decomHandler, scrollingHandler,
                 charsetSwitchHandler, cursorVisibilityManager, textFormater, nrcsHandler,
-                cursorController, leftRightMarginModeHandler, copyRectangularAreaHandler,
-                this, eraseCharacterHandler, fillRectangularAreaHandler, cursor,
+                cursorController, leftRightMarginModeHandler, copyRectangularAreaHandler, eraseCharacterHandler, fillRectangularAreaHandler, cursor,
                 lineAttributeHandler, screenBuffer, leftRightMarginSequenceHandler, insertLineHandler
         );
         screenTextDetector = new ScreenTextDetector(screenBuffer);
@@ -205,7 +202,7 @@ public class TerminalApp extends Application {
      * @param primaryStage the primary stage for the UI
      */
     private void initializeUI(Stage primaryStage) {
-        uiController = new UIController(primaryStage, this, screenBuffer, sshManager, cursor);
+        uiController = new UIController(primaryStage, this, screenBuffer, cursor);
         uiController.show();
     }
 
@@ -274,12 +271,9 @@ public class TerminalApp extends Application {
 
     /**
      * Pauses the processing of incoming data.
-     *
-     * @return
      */
-    public boolean pauseProcessing() {
+    public void pauseProcessing() {
         isPaused.set(true);
-        return false;
     }
 
     /**
@@ -318,16 +312,6 @@ public class TerminalApp extends Application {
         }
     }
 
-    /**
-     * Checks if processing has been stopped, and if so, throws an InterruptedException.
-     *
-     * @throws InterruptedException if processing is stopped
-     */
-    public void checkForStop() throws InterruptedException {
-        if (isStopped.get() || Thread.currentThread().isInterrupted()) {
-            throw new InterruptedException("Verarbeitung gestoppt");
-        }
-    }
 
     /**
      * Returns the current SSHManager.
@@ -351,7 +335,7 @@ public class TerminalApp extends Application {
      * Opens the profile selection dialog.
      */
     public void openProfileDialog() {
-        Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage());
+        Optional<SSHConfig> chosen = ProfileManagerDialog.showDialog(uiController.getPrimaryStage(), this);
         chosen.ifPresent(config -> {
             if (sshManager != null && sshManager.isConnected()) {
                 sshManager.disconnect();
@@ -513,7 +497,7 @@ public class TerminalApp extends Application {
     }
 
     public void openLoginSettingsDialog() {
-        LoginSettingsDialog dialog = new LoginSettingsDialog();
+        LoginSettingsDialog dialog = new LoginSettingsDialog(this);
         dialog.show();
     }
     public Cursor getCursor() {
@@ -536,6 +520,11 @@ public class TerminalApp extends Application {
         this.shouldWriteComment = shouldWriteComment;
     }
 
+
+    public UIController getUIController() {
+        return uiController;
+    }
+
     /**
      * The main entry point for the application.
      *
@@ -544,4 +533,5 @@ public class TerminalApp extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
 }

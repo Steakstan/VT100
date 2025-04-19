@@ -1,7 +1,5 @@
 package org.msv.vt100.core;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -62,17 +60,6 @@ public class Cursor {
         lock.lock();
         try {
             return (row + 1) + "," + (column + 1);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public void waitForPosition(String desiredPosition) throws InterruptedException {
-        lock.lock();
-        try {
-            while (!getCursorPositionString().equals(desiredPosition)) {
-                positionChanged.await();
-            }
         } finally {
             lock.unlock();
         }

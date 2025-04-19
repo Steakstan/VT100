@@ -6,15 +6,19 @@
 
 .dialog-button {
     -fx-background-color: rgb(2, 23, 28);
-    -fx-padding: 5 10 5 10;
+    -fx-padding: 8 20;
     -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-background-radius: 10;
 }
 
 .dialog-button:hover {
     -fx-background-color: white;
     -fx-text-fill: rgb(28, 151, 181);
-
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
 }
+
 
 .top-bar-button {
     -fx-background-color: transparent;

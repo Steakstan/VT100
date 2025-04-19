@@ -10,18 +10,6 @@ public class ScreenTextDetector {
         this.screenBuffer = screenBuffer;
     }
 
-    public boolean isAufNrDisplayed() {
-        // Поиск фразы "Auf-Nr.:" в буфере экрана
-        String screenText = screenBuffer.toString();
-        return screenText.contains("Auf-Nr.:");
-    }
-
-    public boolean isLbNrDisplayed() {
-        // Поиск фразы "LB-Nr.:" в буфере экрана
-        String screenText = screenBuffer.toString();
-        return screenText.contains("LB-Nr.:");
-    }
-
     public boolean isWareneingangDisplayed(){
         String screenText = screenBuffer.toString();
         return screenText.contains("Wareneingang");

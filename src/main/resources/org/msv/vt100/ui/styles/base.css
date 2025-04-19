@@ -1,9 +1,4 @@
-.root-dialog {
-    -fx-background-color: transparent;
-    -fx-background-radius: 0 0 15 15;
-    -fx-border-radius: 15;
 
-}
 
 .popup-container {
     -fx-background-color: rgba(7, 54, 66, 0.95);

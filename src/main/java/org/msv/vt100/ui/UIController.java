@@ -25,18 +25,18 @@ public class UIController {
      * @param primaryStage the primary JavaFX Stage.
      * @param terminalApp  the TerminalApp instance (the coordinator).
      * @param screenBuffer the screen buffer for the terminal.
-     * @param sshManager   the SSHManager instance (passed to the InputHandler).
+
      * @param cursor       the Cursor object used in the terminal.
      */
     public UIController(Stage primaryStage, TerminalApp terminalApp,
-                        ScreenBuffer screenBuffer, SSHManager sshManager, Cursor cursor) {
+                        ScreenBuffer screenBuffer, Cursor cursor) {
         this.primaryStage = primaryStage;
         this.customTerminalWindow = new CustomTerminalWindow(primaryStage, terminalApp, screenBuffer);
         // Create the main terminal window that encapsulates all UI elements
         this.terminalCanvas = this.customTerminalWindow.getTerminalCanvas();
 
         // Initialize the input handler and attach it to the canvas
-        InputHandler inputHandler = new InputHandler(terminalApp, sshManager, screenBuffer, cursor);
+        InputHandler inputHandler = new InputHandler(terminalApp, screenBuffer, cursor);
         terminalCanvas.setOnKeyPressed(inputHandler::handleKeyPressed);
         terminalCanvas.setOnKeyTyped(inputHandler::handleKeyTyped);
 

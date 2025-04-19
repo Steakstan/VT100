@@ -4,6 +4,8 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.msv.vt100.OrderAutomation.FileExtractor;
+import org.msv.vt100.TerminalApp;
+import org.msv.vt100.ui.TerminalDialog;
 
 import java.util.*;
 
@@ -28,7 +30,9 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         }
     }
 
-    public static ColumnIndices detectAllColumns(Sheet sheet) {
+
+
+    public static ColumnIndices detectAllColumns(Sheet sheet, TerminalApp terminalApp) {
         int orderCol = detectOrderColumn(sheet);
         int posCol = detectPositionColumn(sheet, orderCol);
         int dateCol = detectDeliveryDateColumn(sheet, posCol);
@@ -44,16 +48,23 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         if (dateCol == -1) {
             messageBuilder.append("\n- Spalte mit Lieferdatum nicht gefunden.");
         }
+
         if ((orderCol == -1 || posCol == -1 || dateCol == -1)) {
-            throw new IllegalStateException("Struktur der Excel-Tabelle unvollständig:" + messageBuilder);
+            TerminalDialog.showError("Struktur der Excel-Tabelle unvollständig:" + messageBuilder, terminalApp.getUIController().getPrimaryStage());
+            return null;
         }
 
         if (dateCol - posCol > 1 && confCol == -1) {
-            throw new IllegalStateException("Zwischen Positionsnummer und Lieferdatum befindet sich eine Spalte, aber keine gültige AB-Nummer erkannt.");
+            TerminalDialog.showError("""
+            Zwischen Positionsnummer und Lieferdatum befindet sich eine zusätzliche Spalte,
+            aber keine gültige AB-Nummer wurde erkannt.
+        """, terminalApp.getUIController().getPrimaryStage());
+            return null;
         }
 
         return new ColumnIndices(orderCol, posCol, dateCol, confCol);
     }
+
 
     public static ExcelOrderData fromExcelRow(Row row, ColumnIndices indices) {
         return fromExcelRow(row, indices.orderCol, indices.posCol, indices.dateCol, indices.confirmationCol);
@@ -94,7 +105,7 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
                 if (cell == null) continue;
                 String val = FileExtractor.extractCellValueAsString(cell).trim();
                 if (val.length() >= 5 && val.length() <= 6 && val.matches("[A-Z0-9]+")) {
-                    String prefix = val.length() >= 2 ? val.substring(0, 2) : "";
+                    String prefix = val.substring(0, 2);
                     if (knownPrefixes.contains(prefix) || prefix.matches("[A-Z0-9]{2}")) {
                         validCount++;
                     }
@@ -219,18 +230,5 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
             return String.format("%02d%02d", Integer.parseInt(raw), year);
         }
         return raw;
-    }
-
-    public static List<ExcelOrderData> extractAllFromSheet(Sheet sheet, int orderCol, int posCol, int dateCol, int confCol) {
-        List<ExcelOrderData> list = new ArrayList<>();
-        for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-            Row row = sheet.getRow(i);
-            if (row == null) continue;
-            ExcelOrderData data = fromExcelRow(row, orderCol, posCol, dateCol, confCol);
-            if (!data.orderNumber().isEmpty() && !data.positionNumber().isEmpty() && !data.deliveryDate().isEmpty()) {
-                list.add(data);
-            }
-        }
-        return list;
     }
 }

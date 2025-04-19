@@ -57,7 +57,7 @@ public class LoginProfileManager {
             if (p.profileName().equals(updatedProfile.profileName())) {
                 updatedList.add(updatedProfile);
             } else {
-                updatedList.add(new LoginProfile(p.profileName(), p.username(), p.password(), newAuto ? false : p.autoConnect()));
+                updatedList.add(new LoginProfile(p.profileName(), p.username(), p.password(), !newAuto && p.autoConnect()));
             }
         }
         saveProfiles(updatedList);

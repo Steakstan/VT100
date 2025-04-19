@@ -44,10 +44,6 @@ public class CharsetSwitchHandler {
         currentCharset = CharsetMode.GRAPHICS;
     }
 
-    // Додаємо метод для отримання поточного режиму
-    public CharsetMode getCurrentCharset() {
-        return currentCharset;
-    }
 
     // Якщо режим GRAPHICS, для заданого тексту виконуємо конвертацію символів
     public String processText(String text) {
@@ -60,19 +56,15 @@ public class CharsetSwitchHandler {
     // Приватний метод конвертації всього рядка (як раніше)
     private String convertToGraphicsCharset(String text) {
         StringBuilder result = new StringBuilder();
-
-        for (char currentChar : text.toCharArray()) {
-            if (graphicsCharMap.containsKey(currentChar)) {
-                result.append(graphicsCharMap.get(currentChar));
+        for (char c : text.toCharArray()) {
+            // Пробелы и управляющие символы остаются без изменений
+            if (c == ' ' || Character.isISOControl(c)) {
+                result.append(c);
             } else {
-                result.append(currentChar);
+                result.append(graphicsCharMap.getOrDefault(c, c));
             }
         }
         return result.toString();
     }
 
-    // Статичний метод для конвертації одного символу за графічною таблицею
-    public static char convertChar(char c) {
-        return graphicsCharMap.getOrDefault(c, c);
-    }
 }

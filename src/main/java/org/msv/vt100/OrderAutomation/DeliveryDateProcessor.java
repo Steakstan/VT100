@@ -27,7 +27,7 @@ public class DeliveryDateProcessor {
         this.screenTextDetector = screenTextDetector;
     }
 
-    public void processDeliveryDate(Sheet sheet, Row row, ExcelOrderData.ColumnIndices indices) throws InterruptedException, IOException {
+    public void processDeliveryDate(Row row, ExcelOrderData.ColumnIndices indices) throws InterruptedException, IOException {
         System.out.println("-----------------------------------------------------");
         System.out.println("START processDeliveryDate: Начало обработки заказа aus Excel.");
 
@@ -41,7 +41,8 @@ public class DeliveryDateProcessor {
         System.out.println("Aus Excel extrahiert: " + orderData);
         System.out.println("AB-Nummer (Bestätigung): " + confirmationNumber);
 
-        String screenText = getInitialScreenText();
+        getInitialScreenText();
+        String screenText;
         navigateToStartPage();
         screenText = getScreenText();
 
@@ -139,12 +140,23 @@ public class DeliveryDateProcessor {
                 System.out.println("Bedingung erfüllt. Sende 'N'.");
                 sendDataWithDelay("N");
                 sendDataWithDelay("\r");
+
+                // 🔽 Neue Bedingung: sofort prüfen, ob 'Bitte ausloesen !' erscheint
+                Thread.sleep(100);
+                String postNscreen = getScreenText();
+                String postNcursor = getCursorPosition();
+                if (postNcursor.equals("24,80") && postNscreen.contains("Bitte ausloesen !")) {
+                    System.out.println("Nach 'N': 'Bitte ausloesen !' erkannt. Starte entsprechende Verarbeitung.");
+                    handleBitteAusloesenLoop();
+                }
+
                 break;
             }
             Thread.sleep(50);
         }
         return true;
     }
+
 
 
     private void handleBitteAusloesenLoop() throws IOException, InterruptedException {
@@ -504,10 +516,9 @@ public class DeliveryDateProcessor {
 
             // Schritt 1: OS senden
             String snapshotBeforeOS = captureRelevantScreenPart();
-            String cursorBeforeOS = cursorBefore;
             System.out.println("Sende '\u001BOQ'");
             sendDataWithDelay("\u001BOQ");
-            boolean changedAfterOS = hasRelevantScreenChanged(snapshotBeforeOS, cursorBeforeOS);
+            boolean changedAfterOS = hasRelevantScreenChanged(snapshotBeforeOS, cursorBefore);
             if (changedAfterOS) {
                 noChangeCounter = 0;
                 continue;
@@ -517,20 +528,6 @@ public class DeliveryDateProcessor {
             }
 
             // Только если OS вызвало изменения — пробуем OQ
-            if (changedAfterOS) {
-                String snapshotBeforeOQ = captureRelevantScreenPart();
-                String cursorBeforeOQ = getCursorPosition();
-                System.out.println("Sende '\u001BOS'");
-                sendDataWithDelay("\u001BOS");
-                boolean changedAfterOQ = hasRelevantScreenChanged(snapshotBeforeOQ, cursorBeforeOQ);
-                if (changedAfterOQ) {
-                    noChangeCounter = 0;
-                    continue;
-                } else {
-                    System.out.println("[DEBUG] Keine Änderung nach OQ. Versuch: " + (noChangeCounter + 1));
-                    noChangeCounter++;
-                }
-            }
 
             if (noChangeCounter >= maxAttempts) {
                 System.out.println("[WARNUNG] Keine Reaktion nach " + maxAttempts + " Versuchen. Warte auf manuelle Änderung...");
@@ -605,7 +602,7 @@ public class DeliveryDateProcessor {
     public void processDeliveryDates(Sheet sheet) throws IOException, InterruptedException {
         System.out.println("Starte Verarbeitung mehrerer Bestellungen...");
 
-        ExcelOrderData.ColumnIndices indices = ExcelOrderData.detectAllColumns(sheet);
+        ExcelOrderData.ColumnIndices indices = ExcelOrderData.detectAllColumns(sheet, terminalApp);
 
         Iterator<Row> rows = sheet.iterator();
         // Пропускаем заголовок
@@ -619,7 +616,7 @@ public class DeliveryDateProcessor {
             terminalApp.checkForPause();
             Row row = rows.next();
             System.out.println("Verarbeite nächste Zeile.");
-            processDeliveryDate(sheet, row, indices);  // ✅ теперь передаём sheet и индексы
+            processDeliveryDate( row, indices);  // ✅ теперь передаём sheet и индексы
         }
 
         System.out.println("Verarbeitung aller Bestellungen abgeschlossen.");
