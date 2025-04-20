@@ -37,20 +37,7 @@ public class BearbeitungseinstellungenDialog {
     }
 
     private void initUI() {
-        HBox header = new HBox();
-        header.getStyleClass().add("dialog-header");
-
-        Label titleLabel = new Label("Bearbeitungseinstellungen");
-        titleLabel.getStyleClass().add("dialog-header-title");
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Button closeButton = new Button("X");
-        closeButton.getStyleClass().add("dialog-header-close-button");
-        closeButton.setOnAction(e -> dialog.close());
-
-        header.getChildren().addAll(titleLabel, spacer, closeButton);
+        HBox header = DialogHelper.createDialogHeader("Bearbeitungseinstellungen", dialog::close);
 
         GridPane grid = new GridPane();
         grid.getStyleClass().add("dialog-grid");
@@ -58,50 +45,39 @@ public class BearbeitungseinstellungenDialog {
         grid.setVgap(10);
         grid.setPadding(new Insets(10));
 
+        // Operation-Auswahl
         Label operationLabel = new Label("Operation:");
         operationLabel.getStyleClass().add("dialog-label-turquoise");
 
         operationComboBox = new ComboBox<>();
-        operationComboBox.setCellFactory(listView -> {
-            // ← Форсируем белый цвет
-            return new ListCell<>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                    } else {
-                        setText(item);
-                        setTextFill(Color.WHITE); // ← Форсируем белый цвет
-                    }
-                }
-            };
-        });
-
-// Форсируем цвет выбранного элемента (отображается в закрытом состоянии ComboBox)
-        operationComboBox.setButtonCell(new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item);
-                    setTextFill(Color.WHITE); // ← тоже белый
-                }
-            }
-        });
-
-
         operationComboBox.getItems().addAll(
                 "Liefertermine und AB-Nummern",
                 "Kommentare verarbeiten"
         );
         operationComboBox.getSelectionModel().select(0);
-        operationComboBox.getStyleClass().add("custom-combobox");
         operationComboBox.setPrefWidth(300);
         operationComboBox.setPrefHeight(30);
+        operationComboBox.getStyleClass().add("custom-combobox");
 
+        // Weißes Dropdown erzwingen
+        operationComboBox.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setTextFill(Color.WHITE);
+            }
+        });
+        operationComboBox.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setTextFill(Color.WHITE);
+            }
+        });
+
+        // Datei-Auswahl
         Label fileLabel = new Label("Datei auswählen:");
         fileLabel.getStyleClass().add("dialog-label-turquoise");
 
@@ -123,6 +99,7 @@ public class BearbeitungseinstellungenDialog {
         HBox fileBox = new HBox(5, filePathField, browseButton);
         fileBox.setAlignment(Pos.CENTER_LEFT);
 
+        // Kommentar-Einstellungen
         commentCheckBox = new CheckBox("Kommentar schreiben");
         commentCheckBox.setSelected(false);
         commentCheckBox.getStyleClass().add("dialog-label-turquoise");
@@ -132,14 +109,13 @@ public class BearbeitungseinstellungenDialog {
 
         commentField = new TextField();
         commentField.setPromptText("Kommentar eingeben...");
-        commentField.getStyleClass().add("dialog-text-field");
         commentField.setDisable(true);
         commentField.setPrefWidth(300);
         commentField.setPrefHeight(30);
-        commentField.addEventFilter(KeyEvent.KEY_TYPED, event -> {
-            if (commentField.getText().length() >= 49) {
-                event.consume();
-            }
+        commentField.getStyleClass().add("dialog-text-field");
+
+        commentField.addEventFilter(KeyEvent.KEY_TYPED, e -> {
+            if (commentField.getText().length() >= 49) e.consume();
         });
 
         Tooltip commentTooltip = new Tooltip("Maximal 49 Zeichen erlaubt.\n\"**\" steht für das Lieferdatum aus der Tabelle.");
@@ -156,8 +132,8 @@ public class BearbeitungseinstellungenDialog {
         commentCheckBox.setOnAction(e -> {
             boolean active = commentCheckBox.isSelected();
             commentField.setDisable(!active);
-            questionIcon.setDisable(!active); // ← добавить это
-            if (active && (commentField.getText().isEmpty() || commentField.getText().isBlank())) {
+            questionIcon.setDisable(!active);
+            if (active && (commentField.getText().isBlank())) {
                 commentField.setText("DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT");
             }
         });
@@ -166,17 +142,16 @@ public class BearbeitungseinstellungenDialog {
         commentBox.getStyleClass().add("comment-box-background");
         commentBox.setAlignment(Pos.CENTER_LEFT);
 
+        // Buttons
         Button startButton = new Button("Verarbeitung starten");
-        startButton.getStyleClass().add("dialog-button");
         startButton.setOnAction(e -> startProcessing());
 
         Button cancelButton = new Button("Abbrechen");
-        cancelButton.getStyleClass().add("dialog-button");
         cancelButton.setOnAction(e -> dialog.close());
 
-        HBox buttonBox = new HBox(10, startButton, cancelButton);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        HBox buttonBox = DialogHelper.createDialogFooter(startButton, cancelButton);
 
+        // Komponenten ins Grid setzen
         grid.add(operationLabel, 0, 0);
         grid.add(operationComboBox, 1, 0);
         grid.add(fileLabel, 0, 1);
@@ -184,6 +159,7 @@ public class BearbeitungseinstellungenDialog {
         grid.add(commentBox, 1, 2);
         grid.add(buttonBox, 1, 3);
 
+        // Root-Setup
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);
@@ -196,7 +172,6 @@ public class BearbeitungseinstellungenDialog {
 
         Scene scene = new Scene(root, 530, 300);
         scene.setFill(Color.TRANSPARENT);
-
         scene.getStylesheets().addAll(
                 safeStylesheet("/org/msv/vt100/ui/styles/base.css"),
                 safeStylesheet("/org/msv/vt100/ui/styles/buttons.css"),
@@ -207,12 +182,11 @@ public class BearbeitungseinstellungenDialog {
 
         dialog.setScene(scene);
         DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
-        DialogHelper.enableDragging(dialog, header); // header — это HBox из заголовка
+        DialogHelper.enableDragging(dialog, header);
 
-
-        // Обеспечить появление Tooltip с задержкой
         Platform.runLater(() -> commentTooltip.setStyle("-fx-show-delay: 100ms;"));
     }
+
 
     private String safeStylesheet(String path) {
         var url = getClass().getResource(path);

@@ -252,7 +252,7 @@ public class TerminalApp extends Application {
      */
     private void startScreenUpdater() {
         Timeline screenUpdateTimeline = new Timeline(
-                new KeyFrame(Duration.millis(16), event -> updateScreen())
+                new KeyFrame(Duration.millis(4), event -> updateScreen())
         );
         screenUpdateTimeline.setCycleCount(Timeline.INDEFINITE);
         screenUpdateTimeline.play();

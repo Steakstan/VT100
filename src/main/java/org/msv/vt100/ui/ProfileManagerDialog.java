@@ -76,7 +76,7 @@ public class ProfileManagerDialog {
 
         autoConnectToggleGroup = new ToggleGroup();
         profileTable = new TableView<>();
-        profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         profileTable.setPlaceholder(new Label("Keine Profile verfügbar"));
         profileTable.getStyleClass().add("custom-table");
 
@@ -91,7 +91,7 @@ public class ProfileManagerDialog {
         TableColumn<SSHConfig, String> dateCol = new TableColumn<>("Letzte Verbindung");
         dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))));
 
-        profileTable.getColumns().addAll(nameCol, hostCol, autoCol, dateCol);
+        profileTable.getColumns().addAll(List.<TableColumn<SSHConfig, ?>>of(nameCol, hostCol, autoCol, dateCol));
         updateProfileList();
 
         profileTable.setOnMouseClicked(event -> {

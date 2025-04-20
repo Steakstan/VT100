@@ -1,8 +1,17 @@
 package org.msv.vt100.core;
 
-import javafx.application.Platform; import org.apache.poi.ss.usermodel.*; import org.apache.poi.xssf.usermodel.XSSFWorkbook; import org.msv.vt100.OrderAutomation.DeliveryDateProcessor; import org.msv.vt100.OrderAutomation.ScreenTextDetector; import org.msv.vt100.TerminalApp; import org.msv.vt100.ssh.SSHManager; import org.msv.vt100.ui.TerminalDialog; import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-
-import java.io.FileInputStream; import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.application.Platform;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.msv.vt100.OrderAutomation.DeliveryDateProcessor;
+import org.msv.vt100.OrderAutomation.ScreenTextDetector;
+import org.msv.vt100.TerminalApp;
+import org.msv.vt100.ssh.SSHManager;
+import org.msv.vt100.ui.TerminalDialog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.io.FileInputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class FileProcessingService {
 private static final Logger logger = LoggerFactory.getLogger(FileProcessingService.class);

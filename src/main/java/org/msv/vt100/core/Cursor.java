@@ -1,5 +1,8 @@
 package org.msv.vt100.core;
 
+import javafx.application.Platform;
+
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -54,6 +57,17 @@ public class Cursor {
 
     public void moveToColumnStart() {
         this.column = 0;
+    }
+
+    public String getCursorPosition() throws InterruptedException {
+        final String[] position = new String[1];
+        CountDownLatch latch = new CountDownLatch(1);
+        Platform.runLater(() -> {
+            position[0] = (getRow() + 1) + "," + (getColumn() + 1);
+            latch.countDown();
+        });
+        latch.await();
+        return position[0];
     }
 
 }

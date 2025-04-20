@@ -161,11 +161,11 @@ public class InputHandler {
         return switch (code) {
             case UP -> "\u001B[A";      // ESC [ A
             case DOWN -> "\u001B[B";    // ESC [ B
-            case RIGHT -> "\u001B[C";   // ESC [ C
-            case LEFT -> "\u001B[D";    // ESC [ D
-            case DELETE -> "\u001B[3~"; // ESC [ 3 ~
-            case HOME -> "\u001B[H";    // ESC [ H
-            case END -> "\u001B[F";     // ESC [ F
+            case RIGHT -> "\u001B[C";   // ESC [C
+            case LEFT -> "\u001B[D";    // ESC [D
+            case DELETE -> "\u001B[3~"; // ESC [3 ~
+            case HOME -> "\u001B[H";    // ESC [H
+            case END -> "\u001B[F";     // ESC [F
             case PAGE_UP -> "\u001B[5~";// ESC [ 5 ~
             case PAGE_DOWN -> "\u001B[6~"; // ESC [ 6 ~
             case F1 -> "\u001BOP";      // ESC O P

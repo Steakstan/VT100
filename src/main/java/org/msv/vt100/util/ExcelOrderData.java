@@ -16,18 +16,7 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         return "Bestellnummer = " + orderNumber + ", Positionsnummer = " + positionNumber + ", Lieferdatum = " + deliveryDate + ", AB-Nummer = " + confirmationNumber;
     }
 
-    public static class ColumnIndices {
-        public final int orderCol;
-        public final int posCol;
-        public final int dateCol;
-        public final int confirmationCol;
-
-        public ColumnIndices(int orderCol, int posCol, int dateCol, int confirmationCol) {
-            this.orderCol = orderCol;
-            this.posCol = posCol;
-            this.dateCol = dateCol;
-            this.confirmationCol = confirmationCol;
-        }
+    public record ColumnIndices(int orderCol, int posCol, int dateCol, int confirmationCol) {
     }
 
 
@@ -122,19 +111,9 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
     public static int detectPositionColumn(Sheet sheet, int orderColumn) {
         int numColumns = sheet.getRow(0).getLastCellNum();
         Row header = sheet.getRow(0);
-        String[] possibleHeaders = {"positionsnummer", "position", "pos."};
 
-        for (int i = orderColumn + 1; i < numColumns; i++) {
-            Cell cell = header.getCell(i);
-            if (cell != null) {
-                String value = FileExtractor.extractCellValueAsString(cell).toLowerCase(Locale.ROOT);
-                for (String headerName : possibleHeaders) {
-                    if (value.contains(headerName)) {
-                        return i;
-                    }
-                }
-            }
-        }
+        int headerMatch = findColumnByKeywords(header, orderColumn + 1, numColumns, "positionsnummer", "position", "pos.");
+        if (headerMatch != -1) return headerMatch;
 
         int rowLimit = Math.min(20, sheet.getLastRowNum());
         for (int col = orderColumn + 1; col < numColumns; col++) {
@@ -156,22 +135,13 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         return -1;
     }
 
+
     public static int detectDeliveryDateColumn(Sheet sheet, int posColumn) {
         Row header = sheet.getRow(0);
         int numColumns = header.getLastCellNum();
-        String[] keywords = {"lieferdatum", "we-datum"};
 
-        for (int i = posColumn + 1; i < numColumns; i++) {
-            Cell cell = header.getCell(i);
-            if (cell != null) {
-                String value = FileExtractor.extractCellValueAsString(cell).toLowerCase(Locale.ROOT);
-                for (String keyword : keywords) {
-                    if (value.contains(keyword)) {
-                        return i;
-                    }
-                }
-            }
-        }
+        int headerMatch = findColumnByKeywords(header, posColumn + 1, numColumns, "lieferdatum", "we-datum");
+        if (headerMatch != -1) return headerMatch;
 
         int rowLimit = Math.min(20, sheet.getLastRowNum());
         for (int col = posColumn + 1; col < numColumns; col++) {
@@ -193,6 +163,7 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         }
         return -1;
     }
+
 
     public static int detectConfirmationColumn(Sheet sheet, int posCol, int dateCol) {
         if (posCol >= 0 && dateCol > posCol + 1) {
@@ -231,4 +202,20 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
         }
         return raw;
     }
+
+    private static int findColumnByKeywords(Row header, int start, int end, String... keywords) {
+        for (int i = start; i < end; i++) {
+            Cell cell = header.getCell(i);
+            if (cell != null) {
+                String value = FileExtractor.extractCellValueAsString(cell).toLowerCase(Locale.ROOT);
+                for (String keyword : keywords) {
+                    if (value.contains(keyword)) {
+                        return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
 }

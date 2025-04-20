@@ -1,6 +1,5 @@
 package org.msv.vt100.OrderAutomation;
 
-import javafx.application.Platform;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.Cursor;
 import org.msv.vt100.core.ScreenBuffer;
@@ -11,7 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
+
+import static org.msv.vt100.util.Waiter.waitUntil;
 
 public class LoginAutomationProcessor {
     private static final Logger logger = LoggerFactory.getLogger(LoginAutomationProcessor.class);
@@ -49,29 +49,21 @@ public class LoginAutomationProcessor {
             return;
         }
 
-        // Ожидаем появления строки "Ihr Kurzzeichen:" в буфере экрана
         logger.info("Waiting for prompt 'Ihr Kurzzeichen:' in screen buffer...");
-        while (!screenBuffer.toString().contains("Ihr Kurzzeichen:")) {
-            if (terminalApp.isStopped()) {
-                logger.info("Terminal processing stopped. Aborting auto login.");
-                return;
-            }
-            Thread.sleep(500);
+        boolean kurzzeichenOk = waitUntil("'Ihr Kurzzeichen:' im Bildschirmtext", () ->
+                screenBuffer.toString().contains("Ihr Kurzzeichen:")
+        );
+        if (!kurzzeichenOk || terminalApp.isStopped()) {
+            logger.info("Terminal stopped or timeout. Abort.");
+            return;
         }
-        logger.info("Prompt 'Ihr Kurzzeichen:' detected.");
 
-        // Ожидаем, пока курсор не окажется на позиции 15,45
         logger.info("Waiting for cursor to reach position 15,45...");
-        while (!getCursorPosition().equals("15,45")) {
-            if (terminalApp.isStopped()) {
-                logger.info("Terminal processing stopped. Aborting auto login.");
-                return;
-            }
-            Thread.sleep(500);
-        }
-        logger.info("Cursor is at position 15,45.");
+        boolean cursorLogin = waitUntil("Cursor bei 15,45", () ->
+                cursor.getCursorPosition().equals("15,45")
+        );
+        if (!cursorLogin || terminalApp.isStopped()) return;
 
-        // Получаем профиль логина, отмеченный как автоподключаемый
         LoginProfile autoLoginProfile = LoginProfileManager.getAutoConnectProfile();
         if (autoLoginProfile != null) {
             logger.info("Auto-login profile found. Sending username: {}", autoLoginProfile.username());
@@ -81,47 +73,31 @@ public class LoginAutomationProcessor {
             logger.info("No auto-login profile marked. Skipping username entry.");
         }
 
-        // Ожидаем появления строки "Ihr  Schutzcode:" в буфере экрана
         logger.info("Waiting for prompt 'Ihr  Schutzcode:' in screen buffer...");
-        while (!screenBuffer.toString().contains("Ihr  Schutzcode:")) {
-            if (terminalApp.isStopped()) {
-                logger.info("Terminal processing stopped. Aborting auto login.");
-                return;
-            }
-            Thread.sleep(500);
-        }
-        logger.info("Prompt 'Ihr  Schutzcode:' detected.");
+        boolean schutzcodeOk = waitUntil("'Ihr  Schutzcode:' im Bildschirmtext", () ->
+                screenBuffer.toString().contains("Ihr  Schutzcode:")
+        );
+        if (!schutzcodeOk || terminalApp.isStopped()) return;
 
-        // Ожидаем, пока курсор не окажется на позиции 17,45
         logger.info("Waiting for cursor to reach position 17,45...");
-        while (!getCursorPosition().equals("17,45")) {
-            if (terminalApp.isStopped()) {
-                logger.info("Terminal processing stopped. Aborting auto login.");
-                return;
-            }
-            Thread.sleep(500);
-        }
-        logger.info("Cursor is at position 17,45.");
+        boolean cursorPwd = waitUntil("Cursor bei 17,45", () ->
+                cursor.getCursorPosition().equals("17,45")
+        );
+        if (!cursorPwd || terminalApp.isStopped()) return;
 
-        // Если профиль найден, отправляем пароль
         if (autoLoginProfile != null) {
             logger.info("Sending password for auto-login profile.");
             sshManager.send(autoLoginProfile.password());
             sshManager.send("\r");
-        } else {
-            logger.info("No auto-login profile available. Skipping password entry.");
         }
 
-        // Дополнительная проверка: если в буфере отображается "Bitte Eingabe-Taste druecken"
-        // и курсор находится на позиции 23,55, то отправляем Enter
         logger.info("Waiting for post-login prompt 'Bitte Eingabe-Taste druecken' and cursor at 23,55...");
-        while (!terminalApp.isStopped() &&
-                (!screenBuffer.toString().contains("Bitte Eingabe-Taste druecken") ||
-                        !getCursorPosition().equals("23,55"))) {
-            Thread.sleep(500);
-        }
-        if (!terminalApp.isStopped()) {
-            logger.info("Post-login prompt detected with cursor at 23,55. Sending Enter.");
+        boolean postLoginPrompt = waitUntil("Bitte Eingabe-Taste druecken + Cursor 23,55", () ->
+                screenBuffer.toString().contains("Bitte Eingabe-Taste druecken")
+                        && cursor.getCursorPosition().equals("23,55")
+        );
+        if (postLoginPrompt && !terminalApp.isStopped()) {
+            logger.info("Prompt detected. Sending Enter.");
             sshManager.send("\r");
         }
 
@@ -129,14 +105,5 @@ public class LoginAutomationProcessor {
         logger.info("Auto login process completed.");
     }
 
-    private String getCursorPosition() throws InterruptedException {
-        final String[] position = new String[1];
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(() -> {
-            position[0] = (cursor.getRow() + 1) + "," + (cursor.getColumn() + 1);
-            latch.countDown();
-        });
-        latch.await();
-        return position[0];
-    }
+
 }

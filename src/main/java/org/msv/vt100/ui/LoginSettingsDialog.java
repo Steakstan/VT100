@@ -38,7 +38,7 @@ public class LoginSettingsDialog {
         dialog.setTitle("Login‑Einstellungen");
 
         // Создаём header с применением стиля dialog-header, который задаёт:
-        // - Закруглённые верхние углы (15 15 0 0) и прямые нижние,
+        // - Закруглённые верхние углы (15 15 0 0) и прямые нижние
         // - Внутренний padding и выравнивание по левому краю.
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
@@ -91,7 +91,7 @@ public class LoginSettingsDialog {
 
         // Создаём таблицу для отображения профилей.
         profileTable = new TableView<>();
-        profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         profileTable.setPlaceholder(new Label("Keine Profile verfügbar"));
         profileTable.getStyleClass().add("custom-table");
         profileTable.setPrefWidth(400);

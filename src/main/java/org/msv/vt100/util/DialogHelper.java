@@ -1,8 +1,14 @@
 package org.msv.vt100.util;
 
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -59,6 +65,34 @@ public class DialogHelper {
             }
         });
     }
+
+    public static HBox createDialogHeader(String title, Runnable onClose) {
+        HBox header = new HBox();
+        header.getStyleClass().add("dialog-header");
+
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("dialog-header-title");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button closeButton = new Button("X");
+        closeButton.getStyleClass().add("dialog-header-close-button");
+        closeButton.setOnAction(e -> onClose.run());
+
+        header.getChildren().addAll(titleLabel, spacer, closeButton);
+        return header;
+    }
+
+    public static HBox createDialogFooter(Button... buttons) {
+        for (Button button : buttons) {
+            button.getStyleClass().add("dialog-button");
+        }
+        HBox box = new HBox(10, buttons);
+        box.setAlignment(Pos.CENTER_RIGHT);
+        return box;
+    }
+
 
     private static class Delta {
         double x, y;
