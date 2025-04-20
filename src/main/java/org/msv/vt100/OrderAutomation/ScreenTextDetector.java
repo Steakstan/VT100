@@ -10,21 +10,22 @@ public class ScreenTextDetector {
         this.screenBuffer = screenBuffer;
     }
 
-    public boolean isWareneingangDisplayed(){
-        String screenText = screenBuffer.toString();
+    public boolean isWareneingangDisplayed() {
+        String screenText = screenBuffer.toStringVisible();
         return screenText.contains("Wareneingang");
     }
-    public boolean isAchtungDisplayed(){
-        String screenText = screenBuffer.toString();
+
+    public boolean isAchtungDisplayed() {
+        String screenText = screenBuffer.toStringVisible();
         return screenText.contains("Aenderungsauftrag");
     }
 
     public boolean isPosNrDisplayed() {
-        // Поиск фразы "LB-Nr.:" в буфере экрана
-        String screenText = screenBuffer.toString();
+        String screenText = screenBuffer.toStringVisible();
         return screenText.contains("Pos-Nr.:");
     }
+
     public String getScreenText() {
-        return screenBuffer.toString();
+        return screenBuffer.toStringVisible();
     }
 }

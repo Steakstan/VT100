@@ -69,7 +69,7 @@ public class DeliveryDateProcessor {
             sendDataWithDelay(positionNumber);
             sendDataWithDelay("\r");
 
-            Thread.sleep(200); // небольшая пауза перед проверкой
+            Thread.sleep(70); // небольшая пауза перед проверкой
             String screenTextAfterPosition = getScreenText();
             if (screenTextAfterPosition.contains("Keine Bestellware!")) {
                 System.out.println("WARNUNG: 'Keine Bestellware!' erkannt. Zurück zur Startseite.");

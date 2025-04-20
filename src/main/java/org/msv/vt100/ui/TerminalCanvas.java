@@ -79,7 +79,8 @@ public class TerminalCanvas extends Canvas {
                 double w = Math.ceil(cellWidth);
                 double h = Math.ceil(cellHeight);
 
-                Cell cell = screenBuffer.getCell(row, col);
+                Cell cell = screenBuffer.getVisibleCell(row, col);
+
                 String ch = cell.character();
 
                 Map<String, String> style = StyleUtils.parseStyleString(cell.style());
@@ -279,7 +280,7 @@ public class TerminalCanvas extends Canvas {
         StringBuilder sb = new StringBuilder();
         for (int row = startRow; row <= endRow; row++) {
             for (int col = startCol; col <= endCol; col++) {
-                sb.append(screenBuffer.getCell(row, col).character());
+                sb.append(screenBuffer.getVisibleCell(row, col).character());
             }
             if (row < endRow) sb.append("\n");
         }

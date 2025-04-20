@@ -1,7 +1,14 @@
 package org.msv.vt100.OrderAutomation;
 
 import javafx.application.Platform;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.msv.vt100.TerminalApp;
 import org.msv.vt100.core.Cursor;
@@ -9,17 +16,12 @@ import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.ssh.SSHManager;
 import org.msv.vt100.ui.TerminalDialog;
 import org.msv.vt100.util.CellValueExtractor;
-import org.msv.vt100.util.Waiter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-
-import static org.msv.vt100.util.Waiter.waitUntil;
+import java.util.concurrent.CountDownLatch;
 
 public class PositionssucheProcessor {
 
@@ -30,7 +32,6 @@ public class PositionssucheProcessor {
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
     private final SSHManager sshManager;
-    private static final Logger log = LoggerFactory.getLogger(PositionssucheProcessor.class);
 
     public PositionssucheProcessor(String orderFilePath, String outputFilePath, String userNumber,
                                    TerminalApp terminalApp, ScreenBuffer screenBuffer, Cursor cursor) {
@@ -53,7 +54,6 @@ public class PositionssucheProcessor {
                     onCompletion.run();
                 });
             } catch (Exception ex) {
-                log.error("Fehler bei der Positionssuche", ex);
                 Platform.runLater(() -> {
                     terminalApp.hideProcessingButtons();
                     TerminalDialog.showError("Fehler bei der Positionssuche: " + ex.getMessage(), terminalApp.getUIController().getPrimaryStage());
@@ -63,97 +63,97 @@ public class PositionssucheProcessor {
     }
 
     public void search() throws Exception {
-        List<String> orders = loadOrders();
+        List<String> orders = new ArrayList<>();
+        try (FileInputStream fis = new FileInputStream(orderFilePath);
+             XSSFWorkbook workbook = new XSSFWorkbook(fis)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                String order = FileExtractor.extractCellValueAsString(row.getCell(0));
+                if (order != null && !order.isEmpty()) {
+                    orders.add(order.trim());
+                }
+            }
+        }
+
         XSSFWorkbook resultWorkbook = new XSSFWorkbook();
         Sheet resultSheet = resultWorkbook.createSheet("Results");
-        CellStyle headerCellStyle = createHeaderCellStyle(resultWorkbook);
-        CellStyle defaultCellStyle = createDefaultCellStyle(resultWorkbook);
-        int resultRowIndex = createHeaderRow(resultSheet, headerCellStyle);
+
+        CellStyle headerCellStyle = resultWorkbook.createCellStyle();
+        Font headerFont = resultWorkbook.createFont();
+        headerFont.setBold(true);
+        headerCellStyle.setFont(headerFont);
+        headerCellStyle.setAlignment(HorizontalAlignment.CENTER);
+        headerCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        headerCellStyle.setBorderTop(BorderStyle.THIN);
+        headerCellStyle.setBorderBottom(BorderStyle.THIN);
+        headerCellStyle.setBorderLeft(BorderStyle.THIN);
+        headerCellStyle.setBorderRight(BorderStyle.THIN);
+
+        CellStyle defaultCellStyle = resultWorkbook.createCellStyle();
+        defaultCellStyle.setAlignment(HorizontalAlignment.CENTER);
+        defaultCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        defaultCellStyle.setBorderTop(BorderStyle.THIN);
+        defaultCellStyle.setBorderBottom(BorderStyle.THIN);
+        defaultCellStyle.setBorderLeft(BorderStyle.THIN);
+        defaultCellStyle.setBorderRight(BorderStyle.THIN);
+
+        int resultRowIndex = 0;
+        Row header = resultSheet.createRow(resultRowIndex++);
+        Cell cell0 = header.createCell(0);
+        cell0.setCellValue("Unternehmensnummer");
+        cell0.setCellStyle(headerCellStyle);
+        Cell cell1 = header.createCell(1);
+        cell1.setCellValue("Bestellungsnummer");
+        cell1.setCellStyle(headerCellStyle);
+        Cell cell2 = header.createCell(2);
+        cell2.setCellValue("Positionsnummer");
+        cell2.setCellStyle(headerCellStyle);
+        Cell cell3 = header.createCell(3);
+        cell3.setCellValue("Modellbeschreibung");
+        cell3.setCellStyle(headerCellStyle);
+        Cell cell4 = header.createCell(4);
+        cell4.setCellValue("Modellnummer");
+        cell4.setCellStyle(headerCellStyle);
+        Cell cell5 = header.createCell(5);
+        cell5.setCellValue("Lieferdatum");
+        cell5.setCellStyle(headerCellStyle);
+        Cell cell6 = header.createCell(6);
+        cell6.setCellValue("AB-Liefertermin");
+        cell6.setCellStyle(headerCellStyle);
+
         String[] firmNumbers = userNumber.split(",");
+        for (int i = 0; i < firmNumbers.length; i++) {
+            firmNumbers[i] = firmNumbers[i].trim();
+        }
 
         for (String order : orders) {
-            if (order.length() == 5) {
-                System.out.println("⏭️ Bestellnummer '" + order + "' hat nur 5 Zeichen – übersprungen.");
-                continue;
-            }
-
-            Map<String, Row> processedRows = new HashMap<>();
-            waitUntil("Warte auf Cursor 3,13", () -> cursor.getCursorPosition().equals("3,13"));
-            System.out.println("📤 Sende Bestellnummer: " + order);
-            sendDataWithDelay(order);
-            sendDataWithDelay("\r");
-
-            System.out.println("⏳ Warte auf Bildschirmwechsel nach Auftragseingabe...");
-            String screenBefore = screenBuffer.toString();
-            String cursorBefore = cursor.getCursorPosition();
-
-            waitUntil("Bildschirmwechsel nach Auftrag", () -> {
+            Map<String, Row> processedRowsForOrder = new HashMap<>();
+            if (terminalApp.isStopped()) break;
+            terminalApp.checkForPause();
+            while (!getCursorPosition().equals("3,13")) {
+                if (terminalApp.isStopped()) break;
                 terminalApp.checkForPause();
-                String currentScreen = screenBuffer.toString();
-                String currentCursor = cursor.getCursorPosition();
-                return !currentScreen.equals(screenBefore) || !currentCursor.equals(cursorBefore);
-            });
-            Waiter.waitFor(() -> true, Duration.ofMillis(100), Duration.ofMillis(100)).get();
-
+                waitForStableScreenSnapshot(Duration.ofSeconds(1), Duration.ofMillis(50));
+            }
+            if (terminalApp.isStopped()) break;
+            sendDataWithDelay(order);
+            Thread.sleep(70);
             ScreenTextDetector detector = new ScreenTextDetector(screenBuffer);
             while (detector.isAchtungDisplayed()) {
-                System.out.println("⚠️ 'Achtung' erkannt. Warte bis verschwunden...");
-                waitUntil("Achtung verschwunden", () -> !new ScreenTextDetector(screenBuffer).isAchtungDisplayed());
+                waitForStableScreenSnapshot(Duration.ofSeconds(1), Duration.ofMillis(50));
             }
-
             boolean finished = false;
-            boolean firstEnterAfterOrder = true;
-            String previousLine7 = null;
-            String previousLine8 = null;
-
             while (!finished) {
                 terminalApp.checkForPause();
                 if (terminalApp.isStopped()) return;
-
-                resultRowIndex = scanLinesAndWriteMatches(
-                        screenBuffer, resultSheet, firmNumbers, order,
-                        resultRowIndex, defaultCellStyle, processedRows
-                );
-
-                String cursorPos = cursor.getCursorPosition();
-                String screenText = screenBuffer.toString();
-
-                if (cursorPos.equals("3,13") && screenText.contains("Auftr-Nr.")) {
-                    System.out.println("🏁 Zurück auf der Startseite. Verarbeitung dieses Auftrags abgeschlossen.");
-                    break;
-                }
-
-                if (cursorPos.equals("23,10") && screenText.contains("Pos/XX")) {
-                    System.out.println("↩️ 'Pos/XX' erkannt. Sende Zurück und beende Auftrag.");
+                resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
+                sendDataWithDelay("\r");
+                Thread.sleep(70);
+                String currentCursor = getCursorPosition();
+                if (currentCursor.equals("23,10")) {
+                    resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                     sendDataWithDelay("\u001BOQ");
-                    break;
-                }
-
-                if (firstEnterAfterOrder && cursorPos.equals("24,73") && screenText.contains("Bitte ausloesen")) {
-                    System.out.println("🟨 Initialer Enter nach 'Bitte ausloesen' (Cursor 24,73) wird gesendet...");
-                    previousLine7 = extractLineData(7);
-                    previousLine8 = extractLineData(8);
-                    sendDataWithDelay("\r");
-                    firstEnterAfterOrder = false;
-                    continue;
-                }
-
-                if (!firstEnterAfterOrder && cursorPos.equals("24,73") && screenText.contains("Bitte ausloesen")) {
-                    String currentLine7 = extractLineData(7);
-                    String currentLine8 = extractLineData(8);
-                    boolean changed7 = !currentLine7.equals(previousLine7);
-                    boolean changed8 = !currentLine8.equals(previousLine8);
-
-                    if (changed7 || changed8) {
-                        System.out.println("✅ Änderung in Zeilen 7 & 8 erkannt. Enter wird erneut gesendet.");
-                        sendDataWithDelay("\r");
-                        previousLine7 = currentLine7;
-                        previousLine8 = currentLine8;
-                    } else {
-                        System.out.println("⏸ Noch keine vollständige Änderung in Zeilen 7 & 8...");
-                    }
-                } else {
-                    System.out.println("⏸ Bedingung für Enter nicht erfüllt (Cursor: " + cursorPos + ").");
+                    finished = true;
                 }
             }
         }
@@ -162,84 +162,26 @@ public class PositionssucheProcessor {
             resultSheet.autoSizeColumn(i);
         }
 
-        try (FileOutputStream fos = new FileOutputStream(
-                outputFilePath.endsWith(".xlsx") ? outputFilePath : outputFilePath + ".xlsx")) {
+        String correctedOutputFilePath = outputFilePath;
+        if (!correctedOutputFilePath.toLowerCase().endsWith(".xlsx")) {
+            correctedOutputFilePath += ".xlsx";
+        }
+        try (FileOutputStream fos = new FileOutputStream(correctedOutputFilePath)) {
             resultWorkbook.write(fos);
         }
         resultWorkbook.close();
     }
 
-
-    private String extractLineData(int row) {
-        int[] cols = new int[79];
-        for (int i = 0; i < 79; i++) cols[i] = i;
-        return CellValueExtractor.extractCells(screenBuffer, row, cols);
+    private String getCursorPosition() throws InterruptedException {
+        final String[] cursorPosition = new String[1];
+        CountDownLatch latch = new CountDownLatch(1);
+        Platform.runLater(() -> {
+            cursorPosition[0] = (cursor.getRow() + 1) + "," + (cursor.getColumn() + 1);
+            latch.countDown();
+        });
+        latch.await();
+        return cursorPosition[0];
     }
-
-
-
-
-
-    private List<String> loadOrders() throws Exception {
-        List<String> orders = new ArrayList<>();
-        try (FileInputStream fis = new FileInputStream(orderFilePath);
-             XSSFWorkbook workbook = new XSSFWorkbook(fis)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            for (Row row : sheet) {
-                String order = FileExtractor.extractCellValueAsString(row.getCell(0));
-                if (order != null && !order.isEmpty()) orders.add(order.trim());
-            }
-        }
-        return orders;
-    }
-
-    private CellStyle createHeaderCellStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        Font font = workbook.createFont();
-        font.setBold(true);
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        return style;
-    }
-
-    private CellStyle createDefaultCellStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        return style;
-    }
-
-    private int createHeaderRow(Sheet sheet, CellStyle style) {
-        Row row = sheet.createRow(0);
-        String[] headers = {
-                "Unternehmensnummer", "Bestellungsnummer", "Positionsnummer",
-                "Modellbeschreibung", "Modellnummer", "Lieferdatum", "AB-Liefertermin"
-        };
-        for (int i = 0; i < headers.length; i++) {
-            Cell cell = row.createCell(i);
-            cell.setCellValue(headers[i]);
-            cell.setCellStyle(style);
-        }
-        return 1;
-    }
-
-
-    private void sendDataWithDelay(String data) throws Exception {
-        log.info("Sende Daten: '{}'", data.replace("\r", "<Enter>"));
-        sshManager.send(data);
-        Waiter.waitFor(() -> true, Duration.ofMillis(60), Duration.ofMillis(30)).get();
-    }
-
-
 
     private int scanLinesAndWriteMatches(ScreenBuffer buffer, Sheet resultSheet, String[] firmNumbers, String order,
                                          int resultRowIndex, CellStyle defaultCellStyle, Map<String, Row> processedRows) throws Exception {
@@ -261,83 +203,53 @@ public class PositionssucheProcessor {
                         String position = CellValueExtractor.extractCells(buffer, line, 0, 1, 2, 3);
                         String key = firm + "_" + position;
                         Row existingRow = processedRows.get(key);
-
                         if (existingRow == null) {
                             Row newRow = resultSheet.createRow(resultRowIndex++);
                             processedRows.put(key, newRow);
 
-                            int finalLine = line;
-                            CompletableFuture<String> descFuture = CompletableFuture.supplyAsync(() ->
-                                    CellValueExtractor.extractCells(buffer, finalLine, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41));
-
-                            int finalLine1 = line;
-                            CompletableFuture<String> modelFuture = CompletableFuture.supplyAsync(() ->
-                                    CellValueExtractor.extractCells(buffer, finalLine1 + 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41));
-
-                            int finalLine2 = line;
-                            CompletableFuture<String> deliveryFuture = CompletableFuture.supplyAsync(() ->
-                                    CellValueExtractor.extractCells(buffer, finalLine2, 63, 64, 65, 66));
-
-                            int finalLine3 = line;
-                            CompletableFuture<String> abFuture = CompletableFuture.supplyAsync(() ->
-                                    CellValueExtractor.extractCells(buffer, finalLine3, 55, 56, 57, 58));
-
-                            try {
-                                CompletableFuture.allOf(descFuture, modelFuture, deliveryFuture, abFuture).join();
-
-                                newRow.createCell(0).setCellValue(firm);
-                                newRow.getCell(0).setCellStyle(defaultCellStyle);
-                                newRow.createCell(1).setCellValue(order);
-                                newRow.getCell(1).setCellStyle(defaultCellStyle);
-                                newRow.createCell(2).setCellValue(position);
-                                newRow.getCell(2).setCellStyle(defaultCellStyle);
-                                newRow.createCell(3).setCellValue(descFuture.get());
-                                newRow.getCell(3).setCellStyle(defaultCellStyle);
-                                newRow.createCell(4).setCellValue(modelFuture.get());
-                                newRow.getCell(4).setCellStyle(defaultCellStyle);
-                                newRow.createCell(5).setCellValue(deliveryFuture.get());
-                                newRow.getCell(5).setCellStyle(defaultCellStyle);
-                                newRow.createCell(6).setCellValue(abFuture.get());
-                                newRow.getCell(6).setCellStyle(defaultCellStyle);
-
-                            } catch (Exception e) {
-                                System.err.println("❌ Fehler beim parallelen Extrahieren: " + e.getMessage());
-                                Thread.currentThread().interrupt();
-                            }
-
                             if (line == 22) {
+                                writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
                                 sendDataWithDelay("\r");
-                                Thread.sleep(200);
+                                Thread.sleep(70);
+                                String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
+                                Cell cellModel = newRow.createCell(4);
+                                cellModel.setCellValue(modelNumber);
+                                cellModel.setCellStyle(defaultCellStyle);
                                 pageTransitioned = true;
                                 break;
+                            } else {
+                                writeNormalRow(newRow, buffer, line, defaultCellStyle, firm, order, position);
                             }
                         } else {
-                            System.out.println("✍️  Zeile bereits vorhanden – Firma: " + firm + ", Position: " + position);
+                            // обновление существующей строки
                             if (line == 22) {
                                 updateRow22(existingRow, buffer, defaultCellStyle);
                             } else {
                                 updateNormalRow(existingRow, buffer, line, defaultCellStyle);
                             }
                         }
+
                     }
                 }
 
-                if (pageTransitioned) break;
+                if (pageTransitioned) break; // выйти из for, чтобы заново начать с новой страницы
             }
 
             if (!pageTransitioned) {
-                String currentCursor = cursor.getCursorPosition();
+                // Если не перешли страницу — проверяем курсор и переходим вручную, если возможно
+                String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
-                    sendDataWithDelay("\u001BOQ");
-                    Thread.sleep(150);
+                    sendDataWithDelay("\u001BOQ"); // Taste F2 — nächste Seite
+                    Thread.sleep(70);
                 } else {
-                    pageHasMore = false;
+                    pageHasMore = false; // больше страниц нет — выходим
                 }
             }
         }
 
         return resultRowIndex;
     }
+
 
     private void writeRow22(Row row, ScreenBuffer buffer, CellStyle defaultCellStyle, String firm, String order, String position) {
         Cell cellFirm = row.createCell(0);
@@ -390,6 +302,7 @@ public class PositionssucheProcessor {
         cellAB.setCellValue(abLiefertermin);
         cellAB.setCellStyle(defaultCellStyle);
     }
+
     private void updateRow22(Row row, ScreenBuffer buffer, CellStyle defaultCellStyle) {
         String modelDescription = CellValueExtractor.extractCells(buffer, 22, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
         String deliveryDate = CellValueExtractor.extractCells(buffer, 22, 63, 64, 65, 66);
@@ -443,6 +356,27 @@ public class PositionssucheProcessor {
         }
         cellAB.setCellValue(abLiefertermin);
         cellAB.setCellStyle(defaultCellStyle);
+    }
+
+
+    private void sendDataWithDelay(String data) throws Exception {
+        sshManager.send(data);
+        Thread.sleep(70);
+    }
+    private void waitForStableScreenSnapshot(Duration timeout, Duration interval) throws InterruptedException {
+        long startTime = System.currentTimeMillis();
+        String last = screenBuffer.toStringVisible();
+
+        while (System.currentTimeMillis() - startTime < timeout.toMillis()) {
+            Thread.sleep(interval.toMillis());
+            terminalApp.checkForPause();
+
+            String current = screenBuffer.toStringVisible();
+            if (current.equals(last)) {
+                return; // экран стабилен
+            }
+            last = current;
+        }
     }
 
 }

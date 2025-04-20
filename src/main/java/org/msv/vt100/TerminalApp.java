@@ -241,11 +241,13 @@ public class TerminalApp extends Application {
      * and rendering the canvas.
      */
     void updateScreen() {
+        screenBuffer.commit(); // ⬅️ Применить изменения из буфера в активный слой
         TerminalCanvas canvas = uiController.getTerminalCanvas();
         canvas.setCursorPosition(cursor.getRow(), cursor.getColumn());
         canvas.cursorVisible = cursorVisibilityManager.isCursorVisible();
-        canvas.updateScreen();  // Render the canvas
+        canvas.updateScreen(); // ⬅️ Будет читать только из текущего слоя
     }
+
 
     /**
      * Starts the periodic screen updater (approximately every 33ms).
