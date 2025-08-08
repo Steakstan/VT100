@@ -33,24 +33,26 @@ public class ProfileManagerDialog {
     private final Tab settingsTab;
     private final TableView<SSHConfig> profileTable;
     private final ToggleGroup autoConnectToggleGroup;
-    private  final TerminalApp terminalApp;
+    private final TerminalApp terminalApp;
 
     private TextField userField;
     private TextField hostField;
     private TextField portField;
     private TextField keyPathField;
 
-    private SSHConfig editingProfile = null;
-    private SSHConfig selectedProfile = null;
+    private SSHConfig editingProfile = null;   // профиль, который редактируем сейчас (old)
+    private SSHConfig selectedProfile = null;  // профиль, выбранный для подключения (возвращается в showAndWait)
 
     public ProfileManagerDialog(Stage owner, TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
+
         dialog = new Stage();
         dialog.initOwner(owner);
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("SSH-Verbindungsprofile");
 
+        // Header
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -71,29 +73,36 @@ public class ProfileManagerDialog {
 
         profilesTab = new Tab("Profile");
         profilesTab.setClosable(false);
+
         settingsTab = new Tab("Profileinstellungen");
         settingsTab.setClosable(false);
 
         autoConnectToggleGroup = new ToggleGroup();
+
+        // Таблица профилей
         profileTable = new TableView<>();
         profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         profileTable.setPlaceholder(new Label("Keine Profile verfügbar"));
         profileTable.getStyleClass().add("custom-table");
 
-        TableColumn<SSHConfig, String> nameCol = new TableColumn<>("Name des Profils");
-        nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().user()));
+        // Колонка Benutzer (раньше „Name des Profils“, но в модели нет отдельного имени)
+        TableColumn<SSHConfig, String> userCol = new TableColumn<>("Benutzer");
+        userCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().user()));
 
         TableColumn<SSHConfig, String> hostCol = new TableColumn<>("Verbindung");
         hostCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().host()));
 
-        TableColumn<SSHConfig, Boolean> autoCol = getSshConfigBooleanTableColumn();
+        TableColumn<SSHConfig, Boolean> autoCol = buildAutoConnectColumn();
 
         TableColumn<SSHConfig, String> dateCol = new TableColumn<>("Letzte Verbindung");
-        dateCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))));
+        dateCol.setCellValueFactory(data ->
+                new ReadOnlyStringWrapper(LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
+        );
 
-        profileTable.getColumns().addAll(List.<TableColumn<SSHConfig, ?>>of(nameCol, hostCol, autoCol, dateCol));
+        profileTable.getColumns().addAll(List.<TableColumn<SSHConfig, ?>>of(userCol, hostCol, autoCol, dateCol));
         updateProfileList();
 
+        // Двойной клик — выбрать профиль и закрыть
         profileTable.setOnMouseClicked(event -> {
             if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
                 SSHConfig selected = profileTable.getSelectionModel().getSelectedItem();
@@ -104,9 +113,11 @@ public class ProfileManagerDialog {
             }
         });
 
+        // Левая часть (таблица) + правая панель кнопок
         VBox tableBox = new VBox(10);
         tableBox.setPadding(new Insets(10));
         tableBox.getStyleClass().add("dialog-grid");
+
         HBox tableWithButtons = new HBox(10);
         tableWithButtons.getChildren().add(profileTable);
         HBox.setHgrow(profileTable, Priority.ALWAYS);
@@ -122,8 +133,8 @@ public class ProfileManagerDialog {
         for (Button b : List.of(connectBtn, editBtn, deleteBtn)) {
             b.getStyleClass().add("dialog-button");
             b.setDisable(true);
-            b.setPrefWidth(100);
-            b.setMinWidth(100);
+            b.setPrefWidth(120);
+            b.setMinWidth(120);
         }
 
         connectBtn.setOnAction(e -> {
@@ -137,7 +148,7 @@ public class ProfileManagerDialog {
         editBtn.setOnAction(e -> {
             SSHConfig selected = profileTable.getSelectionModel().getSelectedItem();
             if (selected != null) {
-                editingProfile = selected;
+                editingProfile = selected; // запомним old
                 populateSettingsFields(selected);
                 tabPane.getSelectionModel().select(settingsTab);
             }
@@ -163,10 +174,14 @@ public class ProfileManagerDialog {
         tableBox.getChildren().add(tableWithButtons);
 
         profilesTab.setContent(tableBox);
+
+        // Контент вкладки „Profileinstellungen“
         buildSettingsTabContent();
+
         tabPane.getTabs().addAll(profilesTab, settingsTab);
         tabPane.getSelectionModel().select(profilesTab);
 
+        // Корень
         BorderPane root = new BorderPane();
         root.setTop(header);
         root.setCenter(tabPane);
@@ -189,25 +204,25 @@ public class ProfileManagerDialog {
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/tabs.css")).toExternalForm(),
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/table.css")).toExternalForm()
         );
+
         dialog.setScene(scene);
         DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
         DialogHelper.enableDragging(dialog, header);
     }
 
-    private TableColumn<SSHConfig, Boolean> getSshConfigBooleanTableColumn() {
+    private TableColumn<SSHConfig, Boolean> buildAutoConnectColumn() {
         TableColumn<SSHConfig, Boolean> autoCol = new TableColumn<>("Automatische Verbindung");
         autoCol.setCellFactory(col -> new TableCell<>() {
             private final RadioButton radio = new RadioButton();
             {
                 radio.setToggleGroup(autoConnectToggleGroup);
-                radio.setOnAction(e -> SSHProfileManager.updateProfile(
-                        new SSHConfig(
-                                getTableView().getItems().get(getIndex()).user(),
-                                getTableView().getItems().get(getIndex()).host(),
-                                getTableView().getItems().get(getIndex()).port(),
-                                getTableView().getItems().get(getIndex()).privateKeyPath(),
-                                true
-                        )));
+                radio.setOnAction(e -> {
+                    SSHConfig item = getTableView().getItems().get(getIndex());
+                    // Гарантируем единственный autoConnect через спец-метод менеджера
+                    SSHProfileManager.setAutoConnect(item, true);
+                    // Обновим таблицу, чтобы снять флаг у остальных строк
+                    updateProfileList();
+                });
             }
             @Override
             protected void updateItem(Boolean item, boolean empty) {
@@ -215,7 +230,8 @@ public class ProfileManagerDialog {
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    radio.setSelected(getTableView().getItems().get(getIndex()).autoConnect());
+                    SSHConfig rowItem = getTableView().getItems().get(getIndex());
+                    radio.setSelected(rowItem.autoConnect());
                     setGraphic(radio);
                 }
             }
@@ -279,19 +295,22 @@ public class ProfileManagerDialog {
                         hostField.getText().trim(),
                         port,
                         keyPathField.getText().trim(),
-                        false
+                        false // autoConnect в форме редактирования не трогаем
                 );
+
                 if (editingProfile == null) {
                     SSHProfileManager.addProfile(newProfile);
                 } else {
-                    SSHProfileManager.updateProfile(newProfile);
+                    // ВАЖНО: обновляем по схеме old -> updated, чтобы не плодить дубликаты
+                    SSHProfileManager.updateProfile(editingProfile, newProfile);
                 }
+
                 clearFields();
                 updateProfileList();
                 tabPane.getSelectionModel().select(profilesTab);
+
             } catch (NumberFormatException ex) {
                 TerminalDialog.showError("Port muss eine Zahl sein.", terminalApp.getUIController().getPrimaryStage());
-
             }
         });
 
@@ -325,6 +344,7 @@ public class ProfileManagerDialog {
         hostField.clear();
         portField.setText("22");
         keyPathField.clear();
+        editingProfile = null;
     }
 
     public Optional<SSHConfig> showAndWait() {
@@ -335,5 +355,4 @@ public class ProfileManagerDialog {
     public static Optional<SSHConfig> showDialog(Stage owner, TerminalApp terminalApp) {
         return new ProfileManagerDialog(owner, terminalApp).showAndWait();
     }
-
 }

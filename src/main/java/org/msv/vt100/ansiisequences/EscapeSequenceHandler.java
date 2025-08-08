@@ -142,7 +142,7 @@ public class EscapeSequenceHandler {
                 break;
             case "#6":
                 // Обработка последовательности ESC #6 (DECDWL)
-                lineAttributeHandler.setDoubleWidthLine(cursor.getRow());
+                lineAttributeHandler.setDoubleWidthLine(cursor.getRow(),true);
                 logger.info("Установлена двойная ширина для строки {}", cursor.getRow() + 1);
                 break;
             case "#5":

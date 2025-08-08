@@ -2,195 +2,205 @@ package org.msv.vt100.ansiisequences;
 
 import org.msv.vt100.core.Cell;
 import org.msv.vt100.core.ScreenBuffer;
+import org.msv.vt100.util.StyleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class ScrollingRegionHandler {
     private static final Logger logger = LoggerFactory.getLogger(ScrollingRegionHandler.class);
+
     private final ScreenBuffer screenBuffer;
-    private final LeftRightMarginModeHandler leftRightMarginModeHandler; // Added
-    private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler; // Added
+    private final LeftRightMarginModeHandler leftRightMarginModeHandler;
+    private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler;
 
-    private int windowStartRow = 0; // The starting row of the scrolling region (0-indexed)
-    private int windowEndRow;       // The ending row of the scrolling region (0-indexed)
+    // Region bounds are 0-based, inclusive
+    private int windowStartRow = 0;
+    private int windowEndRow;
 
-    // Default style for new cells
-    private static final String DEFAULT_STYLE = "-fx-fill: white; -rtfx-background-color: transparent;";
+    // Pattern for CSI Pt;Pb r  (both params optional for full reset)
+    private static final Pattern CSI_SCROLL_REGION = Pattern.compile("^\\u001B?\\[(\\d*);?(\\d*)r$");
 
-    /**
-     * Constructs a ScrollingRegionHandler.
-     *
-     * @param screenBuffer                   the screen buffer to be manipulated
-     * @param leftRightMarginModeHandler     handler for left/right margin mode
-     * @param leftRightMarginSequenceHandler handler for left/right margin sequences
-     */
     public ScrollingRegionHandler(ScreenBuffer screenBuffer,
                                   LeftRightMarginModeHandler leftRightMarginModeHandler,
                                   LeftRightMarginSequenceHandler leftRightMarginSequenceHandler) {
         this.screenBuffer = screenBuffer;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
         this.leftRightMarginSequenceHandler = leftRightMarginSequenceHandler;
-        this.windowEndRow = screenBuffer.getRows() - 1; // Initialize the bottom boundary of the scrolling region
+        // Initialize to full screen
+        this.windowEndRow = screenBuffer.getRows() - 1;
     }
 
     /**
-     * Sets the scrolling region based on an ANSI control sequence.
-     *
-     * @param sequence the sequence containing the scrolling region boundaries in the format "[Pt;Pb]r"
+     * Parses and applies CSI Pt;Pb r (DECSTBM).
+     * Empty parameters mean "reset to full screen".
+     * Indices in the sequence are 1-based; internally we store 0-based.
      */
     public void setScrollingRegion(String sequence) {
         try {
-            // Remove ESC, '[', and 'r' for proper parsing of the boundaries
-            sequence = sequence.replaceAll("[\\u001B\\[r]", "");
-            String[] bounds = sequence.split(";");
-
-            int totalRows = screenBuffer.getRows();
-
-            // Get the top and bottom boundaries with validation
-            windowStartRow = parseBoundary(bounds, 0, 1) - 1;
-            windowEndRow = parseBoundary(bounds, 1, totalRows) - 1;
-
-            // Ensure boundaries are within valid range
-            windowStartRow = Math.max(0, windowStartRow);
-            windowEndRow = Math.min(totalRows - 1, windowEndRow);
-
-            if (!isValidScrollingRegion(windowStartRow, windowEndRow)) {
-                logger.warn("Scrolling region out of valid range: {}", sequence);
+            Matcher m = CSI_SCROLL_REGION.matcher(sequence);
+            if (!m.matches()) {
+                logger.debug("Ignoring non-scroll-region sequence: {}", sequence);
                 return;
             }
 
-            logger.info("Scrolling region set: from row {} to {}, columns {} to {}",
-                    windowStartRow + 1, windowEndRow + 1,
-                    leftRightMarginSequenceHandler.getLeftMargin() + 1,
-                    leftRightMarginSequenceHandler.getRightMargin() + 1);
+            int rows = screenBuffer.getRows();
+            // Defaults per spec: Pt=1, Pb=rows
+            int Pt = parseOrDefault(m.group(1), 1);
+            int Pb = parseOrDefault(m.group(2), rows);
 
-        } catch (NumberFormatException e) {
-            logger.error("Invalid format for scrolling region: {}", sequence, e);
+            // Clamp to [1..rows]
+            Pt = Math.max(1, Math.min(Pt, rows));
+            Pb = Math.max(1, Math.min(Pb, rows));
+
+            // Ensure Pt <= Pb
+            if (Pt > Pb) {
+                // Swap to keep a valid region instead of rejecting
+                int t = Pt; Pt = Pb; Pb = t;
+            }
+
+            int newStart = Pt - 1;
+            int newEnd   = Pb - 1;
+
+            if (!isValidScrollingRegion(newStart, newEnd)) {
+                // Fallback to full screen if invalid (shouldn't happen after clamping)
+                resetToFullScreen();
+                logger.debug("Invalid region after clamp; reset to full screen.");
+                return;
+            }
+
+            this.windowStartRow = newStart;
+            this.windowEndRow = newEnd;
+
+            int left = getCurrentLeftMargin();
+            int right = getCurrentRightMargin();
+
+            logger.debug("Scrolling region set: rows {}..{} (1-based), columns {}..{} (1-based)",
+                    windowStartRow + 1, windowEndRow + 1, left + 1, right + 1);
+
+        } catch (Exception e) {
+            // Be robust: on any parsing failure, reset to full screen
+            resetToFullScreen();
+            logger.debug("Failed to parse scrolling region '{}'. Reset to full screen.", sequence, e);
         }
     }
 
     /**
-     * Scrolls down within the scrolling region by n lines.
-     *
-     * @param n the number of lines to scroll down
+     * Scrolls down within the current region by n lines.
+     * Lines move towards larger row indices; new lines appear at the top.
      */
     public void scrollDownWithinRegion(int n) {
+        if (n <= 0 || windowEndRow < windowStartRow) return;
+
         int columns = screenBuffer.getColumns();
+        int left = getCurrentLeftMargin();
+        int right = Math.min(getCurrentRightMargin(), columns - 1);
 
-        // Get current left and right margins
-        int leftMargin = 0;
-        int rightMargin = columns - 1;
+        // Clamp n to region height
+        int height = windowEndRow - windowStartRow + 1;
+        n = Math.min(n, height);
 
-        if (leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-            leftMargin = leftRightMarginSequenceHandler.getLeftMargin();
-            rightMargin = leftRightMarginSequenceHandler.getRightMargin();
-        }
-
-        // Ensure margins are within bounds
-        leftMargin = Math.max(0, leftMargin);
-        rightMargin = Math.min(columns - 1, rightMargin);
-
-        // Adjust n so that it does not exceed the scrolling region
-        n = Math.min(n, windowEndRow - windowStartRow + 1);
-
-        // Scroll down within the scrolling region and margins
+        // Shift down: bottom to top to avoid overwriting; deep-copy cells to prevent aliasing
         for (int row = windowEndRow; row >= windowStartRow + n; row--) {
-            for (int col = leftMargin; col <= rightMargin; col++) {
-                Cell prevCell = screenBuffer.getCell(row - n, col);
-                screenBuffer.setCell(row, col, prevCell);
+            for (int col = left; col <= right; col++) {
+                Cell src = screenBuffer.getCell(row - n, col);
+                screenBuffer.setCell(row, col, cloneCell(src));
             }
         }
 
-        // Clear the top n lines within the margins
+        // Clear top n lines within margins
         for (int row = windowStartRow; row < windowStartRow + n; row++) {
-            for (int col = leftMargin; col <= rightMargin; col++) {
-                screenBuffer.setCell(row, col, new Cell(" ", DEFAULT_STYLE));
-            }
+            clearLine(row, left, right);
         }
 
-        logger.info("Scrolled down within region from row {} to {}, columns {}-{}, by {} lines",
-                windowStartRow + 1, windowEndRow + 1, leftMargin + 1, rightMargin + 1, n);
+        logger.debug("Scrolled down within region rows {}..{}, cols {}..{}, by {} lines",
+                windowStartRow + 1, windowEndRow + 1, left + 1, right + 1, n);
     }
 
     /**
-     * Scrolls up the content within the scrolling region by one line.
-     * Takes into account the set left and right margins.
+     * Scrolls up within the current region by one line.
+     * Lines move towards smaller row indices; a new blank line appears at the bottom.
      */
     public void scrollUpWithinRegion() {
+        if (windowEndRow < windowStartRow) return;
+
         int columns = screenBuffer.getColumns();
+        int left = getCurrentLeftMargin();
+        int right = Math.min(getCurrentRightMargin(), columns - 1);
 
-        // Get current left and right margins
-        int leftMargin = 0;
-        int rightMargin = columns - 1;
-
-        if (leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-            leftMargin = leftRightMarginSequenceHandler.getLeftMargin();
-            rightMargin = leftRightMarginSequenceHandler.getRightMargin();
-        }
-
-        // Ensure margin boundaries are correct
-        leftMargin = Math.max(0, leftMargin);
-        rightMargin = Math.min(columns - 1, rightMargin);
-
-        // Scroll up within the scrolling region and margins
+        // Shift up: top to bottom; deep-copy cells to prevent aliasing
         for (int row = windowStartRow; row < windowEndRow; row++) {
-            for (int col = leftMargin; col <= rightMargin; col++) {
-                Cell nextCell = screenBuffer.getCell(row + 1, col);
-                screenBuffer.setCell(row, col, nextCell);
+            for (int col = left; col <= right; col++) {
+                Cell src = screenBuffer.getCell(row + 1, col);
+                screenBuffer.setCell(row, col, cloneCell(src));
             }
         }
 
-        // Clear the bottom row within the margins
-        for (int col = leftMargin; col <= rightMargin; col++) {
-            screenBuffer.setCell(windowEndRow, col, new Cell(" ", DEFAULT_STYLE));
-        }
+        // Clear bottom line within margins
+        clearLine(windowEndRow, left, right);
 
-        logger.info("Scrolled up within region from row {} to {}, columns {}-{}",
-                windowStartRow + 1, windowEndRow + 1, leftMargin + 1, rightMargin + 1);
+        logger.debug("Scrolled up within region rows {}..{}, cols {}..{}",
+                windowStartRow + 1, windowEndRow + 1, left + 1, right + 1);
     }
 
     /**
-     * Checks whether the given scrolling region is valid.
-     *
-     * @param startRow the start row index
-     * @param endRow   the end row index
-     * @return true if the region is valid; false otherwise
+     * Resets the region to the full screen (1..rows).
      */
+    public void resetToFullScreen() {
+        this.windowStartRow = 0;
+        this.windowEndRow = screenBuffer.getRows() - 1;
+    }
+
+    public int getWindowStartRow() {
+        return windowStartRow;
+    }
+
+    public int getWindowEndRow() {
+        return windowEndRow;
+    }
+
+    // ----- Helpers -----
+
     private boolean isValidScrollingRegion(int startRow, int endRow) {
         int totalRows = screenBuffer.getRows();
         return startRow >= 0 && endRow < totalRows && startRow <= endRow;
     }
 
-    /**
-     * Parses a boundary value from the bounds array.
-     *
-     * @param bounds       an array of boundary strings
-     * @param index        the index to parse
-     * @param defaultValue the default value if the boundary is missing
-     * @return the parsed boundary value
-     */
-    private int parseBoundary(String[] bounds, int index, int defaultValue) {
-        if (bounds.length > index && !bounds[index].isEmpty()) {
-            return Integer.parseInt(bounds[index]);
+    private int parseOrDefault(String s, int def) {
+        if (s == null || s.isEmpty()) return def;
+        try {
+            int v = Integer.parseInt(s);
+            return (v == 0) ? def : v;
+        } catch (NumberFormatException e) {
+            return def;
         }
-        return defaultValue;
     }
 
-    /**
-     * Returns the starting row of the scrolling region (1-indexed).
-     *
-     * @return the starting row
-     */
-    public int getWindowStartRow() {
-        return windowStartRow;
+    private int getCurrentLeftMargin() {
+        if (leftRightMarginModeHandler != null && leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
+            return Math.max(0, leftRightMarginSequenceHandler.getLeftMargin());
+        }
+        return 0;
     }
 
-    /**
-     * Returns the ending row of the scrolling region (1-indexed).
-     *
-     * @return the ending row
-     */
-    public int getWindowEndRow() {
-        return windowEndRow;
+    private int getCurrentRightMargin() {
+        int max = screenBuffer.getColumns() - 1;
+        if (leftRightMarginModeHandler != null && leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
+            return Math.min(max, leftRightMarginSequenceHandler.getRightMargin());
+        }
+        return max;
+    }
+
+    private void clearLine(int row, int left, int right) {
+        for (int col = left; col <= right; col++) {
+            screenBuffer.setCell(row, col, new Cell(" ", StyleUtils.getDefaultStyle()));
+        }
+    }
+
+    private Cell cloneCell(Cell c) {
+        // Defensive copy; assumes Cell is immutable-like (char + style string)
+        return new Cell(c.character(), c.style());
     }
 }

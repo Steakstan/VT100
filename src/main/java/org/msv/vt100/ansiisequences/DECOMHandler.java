@@ -3,38 +3,72 @@ package org.msv.vt100.ansiisequences;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * DECOMHandler отвечает за управление DEC Origin Mode (DECOM),
- * который включает и отключает режим относительного перемещения курсора.
- * В этом режиме координаты курсора интерпретируются относительно текущего окна.
+ * Handles DEC Origin Mode (DECOM).
+ *
+ * Semantics:
+ * - When DECOM is ON (CSI ?6h), the origin for CUP (cursor position) is the current scrolling region's
+ *   top-left corner (and, if DECVLRM is active, the left margin).
+ * - When DECOM is OFF (CSI ?6l), CUP is absolute relative to the full screen (top-left at 1,1).
+ *
+ * This class stores the current mode and notifies listeners on changes. It does not apply cursor math itself;
+ * consumers (e.g., CursorController) should query {@link #isRelativeCursorMode()} and adapt positioning logic.
  */
 public class DECOMHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(DECOMHandler.class);
 
-    private boolean relativeCursorMode = false;  // Хранение текущего состояния DECOM режима
+    private volatile boolean relativeCursorMode = false;  // current DECOM state
 
-    /**
-     * Включает режим относительного перемещения курсора (DECOM).
-     */
+    // Optional listeners to react on mode changes (e.g., to repaint or normalize cursor)
+    private final List<Runnable> changeListeners = new ArrayList<>();
+
+    /** Enables relative cursor origin (DECOM ON). Idempotent. */
     public void enableRelativeCursorMode() {
-        this.relativeCursorMode = true;
-        logger.info("Включен режим относительного перемещения курсора (DECOM)");
+        setRelativeCursorMode(true);
     }
 
-    /**
-     * Отключает режим относительного перемещения курсора (DECOM).
-     */
+    /** Disables relative cursor origin (DECOM OFF). Idempotent. */
     public void disableRelativeCursorMode() {
-        this.relativeCursorMode = false;
-        logger.info("Отключен режим относительного перемещения курсора (DECOM)");
+        setRelativeCursorMode(false);
     }
 
-    /**
-     * Возвращает текущее состояние DECOM режима.
-     * @return true, если включен режим относительного перемещения курсора
-     */
+    /** Returns current DECOM state. */
     public boolean isRelativeCursorMode() {
         return relativeCursorMode;
+    }
+
+    /**
+     * Registers a listener invoked whenever DECOM state changes.
+     * Listener is called on the same thread that triggers the change.
+     */
+    public void addChangeListener(Runnable listener) {
+        if (listener != null) {
+            changeListeners.add(listener);
+        }
+    }
+
+    // ---- internals ----
+
+    private void setRelativeCursorMode(boolean on) {
+        if (this.relativeCursorMode == on) {
+            return; // no-op if unchanged
+        }
+        this.relativeCursorMode = on;
+        logger.debug("DECOM {}.", on ? "enabled" : "disabled");
+        notifyListeners();
+    }
+
+    private void notifyListeners() {
+        for (Runnable l : changeListeners) {
+            try {
+                l.run();
+            } catch (Exception e) {
+                logger.debug("DECOM listener threw: {}", e.toString());
+            }
+        }
     }
 }

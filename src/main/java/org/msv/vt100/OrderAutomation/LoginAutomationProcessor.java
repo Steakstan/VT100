@@ -60,7 +60,7 @@ public class LoginAutomationProcessor {
 
         logger.info("Waiting for cursor to reach position 15,45...");
         boolean cursorLogin = waitUntil("Cursor bei 15,45", () ->
-                cursor.getCursorPosition().equals("15,45")
+                cursor.getCursorPosition().equals("15,36")
         );
         if (!cursorLogin || terminalApp.isStopped()) return;
 
@@ -81,7 +81,7 @@ public class LoginAutomationProcessor {
 
         logger.info("Waiting for cursor to reach position 17,45...");
         boolean cursorPwd = waitUntil("Cursor bei 17,45", () ->
-                cursor.getCursorPosition().equals("17,45")
+                cursor.getCursorPosition().equals("17,36")
         );
         if (!cursorPwd || terminalApp.isStopped()) return;
 

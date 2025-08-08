@@ -3,87 +3,148 @@ package org.msv.vt100.ansiisequences;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Objects;
+import java.util.Map;
 
+/**
+ * Handles National Replacement Character Sets (NRCS).
+ * VT terminals can map a small ASCII subset to national variants when NRCS is enabled.
+ * This class performs a simple character-for-character replacement when enabled.
+ *
+ * Notes:
+ * - NRCS is independent from DEC Special Graphics (handled elsewhere).
+ * - If NRCS is disabled, input text is passed through unchanged.
+ */
 public class NrcsHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(NrcsHandler.class);
 
-    // Перечисление доступных национальных наборов символов
+    /** Supported NRCS modes (extend as needed). */
     public enum NrcsMode {
-        US,      // Американский (ASCII)
-        UK,      // Британский
-        GERMAN,  // Немецкий
-        // Добавьте другие наборы символов по необходимости
+        US,      // US-ASCII (identity mapping)
+        UK,      // British NRCS (e.g., '#' -> '£')
+        GERMAN   // German NRCS (brackets -> umlauts, tilde -> ß, etc.)
     }
 
-    // Текущий режим NRCS
-    private NrcsMode currentNrcsMode;
+    /** Current NRCS mode. */
+    private NrcsMode currentNrcsMode = NrcsMode.US;
 
-    // Флаг, указывающий, включен ли режим NRCS
-    private boolean isNrcsEnabled;
+    /** Whether NRCS translation is active. */
+    private boolean nrcsEnabled = false;
 
-    // Маппинг символов для текущего набора NRCS
-    private final HashMap<Character, Character> nrcsMapping;
+    /** Current mapping table for the active NRCS. */
+    private Map<Character, Character> nrcsMapping = Collections.emptyMap();
 
     public NrcsHandler() {
-        // По умолчанию используем американский ASCII набор символов
-        this.currentNrcsMode = NrcsMode.US;
-        this.isNrcsEnabled = false;
-        this.nrcsMapping = new HashMap<>();
-        initializeMappings();
+        // Default: US (identity) and disabled.
+        loadMappingFor(NrcsMode.US);
     }
 
-    // Метод для включения NRCS режима
-    public void enableNrcsMode(NrcsMode nrcsMode) {
-        this.currentNrcsMode = nrcsMode;
-        this.isNrcsEnabled = true;
-        initializeMappings();
-        logger.info("NRCS режим включен. Текущий набор символов: {}", nrcsMode);
+    /**
+     * Enables NRCS with the given mode.
+     */
+    public void enableNrcsMode(NrcsMode mode) {
+        if (mode == null) mode = NrcsMode.US;
+        this.currentNrcsMode = mode;
+        this.nrcsEnabled = true;
+        loadMappingFor(mode);
+        logger.debug("NRCS enabled. Mode={}", mode);
     }
 
-    // Метод для отключения NRCS режима
+    /**
+     * Disables NRCS (reverts to US mapping but pass-through remains in effect).
+     */
     public void disableNrcsMode() {
-        this.isNrcsEnabled = false;
+        this.nrcsEnabled = false;
         this.currentNrcsMode = NrcsMode.US;
-        this.nrcsMapping.clear();
-        logger.info("NRCS режим отключен.");
+        loadMappingFor(NrcsMode.US);
+        logger.debug("NRCS disabled.");
     }
 
-    // Метод для обработки текста с учетом NRCS
+    /**
+     * Processes a whole string through the current NRCS mapping.
+     * If NRCS is disabled or text is null/empty, returns the input unchanged.
+     */
     public String processText(String text) {
-        if (!isNrcsEnabled) {
+        if (!nrcsEnabled || text == null || text.isEmpty()) {
             return text;
         }
-
-        StringBuilder result = new StringBuilder();
-
-        for (char c : text.toCharArray()) {
-            if (nrcsMapping.containsKey(c)) {
-                result.append(nrcsMapping.get(c));
-            } else {
-                result.append(c);
-            }
+        StringBuilder sb = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            sb.append(mapChar(text.charAt(i)));
         }
-
-        return result.toString();
+        return sb.toString();
     }
 
-    // Инициализация маппинга символов для выбранного NRCS
-    private void initializeMappings() {
-        nrcsMapping.clear();
+    /**
+     * Processes a single character through NRCS mapping.
+     * Useful for hot paths where characters are emitted one-by-one.
+     */
+    public char processChar(char c) {
+        if (!nrcsEnabled) return c;
+        return mapChar(c);
+    }
 
-        if (Objects.requireNonNull(currentNrcsMode) == NrcsMode.GERMAN) {// Пример маппинга для немецкого набора символов
-            nrcsMapping.put('[', 'Ä');
-            nrcsMapping.put('\\', 'Ö');
-            nrcsMapping.put(']', 'Ü');
-            nrcsMapping.put('{', 'ä');
-            nrcsMapping.put('|', 'ö');
-            nrcsMapping.put('}', 'ü');
-            nrcsMapping.put('~', 'ß');
-            nrcsMapping.put((char) 0xB4, '´');
-            nrcsMapping.put('®', '®');
+    /**
+     * Returns the current NRCS mode.
+     */
+    public NrcsMode getCurrentNrcsMode() {
+        return currentNrcsMode;
+    }
+
+    /**
+     * Returns whether NRCS translation is currently enabled.
+     */
+    public boolean isNrcsEnabled() {
+        return nrcsEnabled;
+    }
+
+    // ---- Internals ----
+
+    private char mapChar(char c) {
+        Character mapped = nrcsMapping.get(c);
+        return (mapped != null) ? mapped : c;
+    }
+
+    /**
+     * Loads the mapping for a given NRCS mode.
+     * The mapping is intentionally minimal and targets common historical sets.
+     * Extend carefully if your sources require more substitutions.
+     */
+    private void loadMappingFor(NrcsMode mode) {
+        Map<Character, Character> map = new HashMap<>();
+
+        switch (mode) {
+            case US:
+                // Identity — keep map empty for fast path
+                break;
+
+            case UK:
+                // Classic UK NRCS: '#' (0x23) becomes '£'
+                map.put('#', '£');
+                break;
+
+            case GERMAN:
+                // Common German NRCS substitutions (ISO 646-DE style variants used by VT-class terminals)
+                // Brackets and some punctuation replaced by umlauts/ß.
+                map.put('[', 'Ä');
+                map.put('\\', 'Ö');
+                map.put(']', 'Ü');
+                map.put('{', 'ä');
+                map.put('|', 'ö');
+                map.put('}', 'ü');
+                map.put('~', 'ß');
+                // Optional acute accent on many legacy sets was a dead key; we skip combining behavior here.
+                // Add only safe, non-combining characters to avoid breaking column math.
+                break;
+
+            default:
+                // Fallback to identity
+                logger.debug("Unknown NRCS mode {}; using US identity mapping.", mode);
         }
+
+        // Freeze the map to avoid accidental mutation
+        this.nrcsMapping = map.isEmpty() ? Collections.emptyMap() : Collections.unmodifiableMap(map);
     }
 }

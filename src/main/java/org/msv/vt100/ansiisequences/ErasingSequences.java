@@ -1,11 +1,24 @@
 package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.core.ScreenBuffer;
 import org.msv.vt100.core.Cell;
 import org.msv.vt100.core.Cursor;
+import org.msv.vt100.core.ScreenBuffer;
+import org.msv.vt100.util.StyleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Implements erase operations (ED/EL/ECH family) and line deletion within the scrolling region.
+ *
+ * Notes on margins and regions:
+ * - EL/ECH honor DECVLRM: operations are restricted to [leftMargin..rightMargin].
+ * - ED(0) "from cursor to end of screen" and ED(1) "from start to cursor" honor margins horizontally
+ *   to match typical app expectations in margin mode (consistent with existing codebase).
+ * - ED(2) "entire screen" explicitly ignores L/R margins and clears full width of all rows.
+ *
+ * Scrolling region:
+ * - deleteLines (DL) only acts when the cursor is inside the scrolling region and respects DECVLRM horizontally.
+ */
 public class ErasingSequences {
 
     private static final Logger logger = LoggerFactory.getLogger(ErasingSequences.class);
@@ -15,154 +28,200 @@ public class ErasingSequences {
     private final ScrollingRegionHandler scrollingRegionHandler;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
 
-    public ErasingSequences(ScreenBuffer screenBuffer, Cursor cursor, ScrollingRegionHandler scrollingRegionHandler, LeftRightMarginModeHandler leftRightMarginModeHandler) {
+    public ErasingSequences(ScreenBuffer screenBuffer,
+                            Cursor cursor,
+                            ScrollingRegionHandler scrollingRegionHandler,
+                            LeftRightMarginModeHandler leftRightMarginModeHandler) {
         this.screenBuffer = screenBuffer;
         this.cursor = cursor;
         this.scrollingRegionHandler = scrollingRegionHandler;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
     }
 
-    // Сохраняет текущую позицию курсора, выполняет операцию очистки и восстанавливает позицию курсора
-    private void performClearOperation(Runnable clearOperation) {
-        // Сохраняем текущую позицию курсора
-        int initialRow = cursor.getRow();
-        int initialColumn = cursor.getColumn();
+    // -------------------- Public API (ED/EL/ECH used by dispatcher) --------------------
 
-        // Выполняем операцию очистки
-        clearOperation.run();
-
-        // Восстанавливаем курсор на сохранённую позицию
-        cursor.setPosition(initialRow, initialColumn);
-        logger.info("Курсор возвращен на исходную позицию: строка = {}, колонка = {}", initialRow + 1, initialColumn + 1);
-    }
-
-    // Очищает экран от текущей позиции курсора до конца экрана
+    /** ED(0): Clear from cursor to end of screen (rows below cursor fully; this row from cursor to right). */
     public void clearFromCursorToEndOfScreen() {
-        performClearOperation(() -> {
-            int currentRow = cursor.getRow();
+        performWithCursorRestore(() -> {
+            int row = cursor.getRow();
+            int col = Math.max(cursor.getColumn(), getLeftMargin());
+            int rows = screenBuffer.getRows();
 
-            logger.info("Начало очистки экрана от курсора: строка = {}, столбец = {}", currentRow + 1, cursor.getColumn() + 1);
+            // 1) Clear from cursor to end of line (within margins)
+            clearRangeInLine(row, col, getRightMargin());
 
-            // Очищаем от текущей позиции до конца текущей строки
-            clearFromCursorToEndOfLine();
-
-            // Очищаем все строки после текущей
-            int totalRows = screenBuffer.getRows();
-            for (int row = currentRow + 1; row < totalRows; row++) {
-                clearLine(row);
+            // 2) Clear all lines after current (within margins)
+            for (int r = row + 1; r < rows; r++) {
+                clearLineWithinMargins(r);
             }
 
-            logger.info("Завершена очистка экрана от строки {} до конца экрана.", currentRow + 1);
+            logger.debug("ED(0): cleared from cursor to end of screen starting at row {}, col {} (1-based).",
+                    row + 1, col + 1);
         });
     }
 
-    // Очищает весь экран
+    /** ED(1): Clear from start of screen to cursor (rows above cursor fully; this row from left to cursor). */
+    public void clearFromStartOfScreenToCursor() {
+        performWithCursorRestore(() -> {
+            int row = cursor.getRow();
+            int col = Math.min(cursor.getColumn(), getRightMargin());
+
+            // 1) Clear all lines before current (within margins)
+            for (int r = 0; r < row; r++) {
+                clearLineWithinMargins(r);
+            }
+
+            // 2) Clear from left margin to cursor in current row
+            clearRangeInLine(row, getLeftMargin(), col);
+
+            logger.debug("ED(1): cleared from start of screen to cursor ending at row {}, col {} (1-based).",
+                    row + 1, col + 1);
+        });
+    }
+
+    /** ED(2): Clear entire screen (ignores L/R margins; clears full width of all rows). */
     public void clearEntireScreen() {
-        performClearOperation(() -> {
-            logger.info("Начало полной очистки экрана.");
-            int totalRows = screenBuffer.getRows();
-            for (int row = 0; row < totalRows; row++) {
-                clearLine(row);
+        performWithCursorRestore(() -> {
+            int rows = screenBuffer.getRows();
+            int cols = screenBuffer.getColumns();
+            for (int r = 0; r < rows; r++) {
+                clearRangeInLineFullWidth(r, 0, cols - 1);
             }
-            logger.info("Завершена полная очистка экрана.");
+            logger.debug("ED(2): cleared entire screen (full width, all rows).");
         });
     }
 
-    // Очищает всю строку, где в данный момент находится курсор
+    /** EL(2): Clear entire line at the cursor (within margins). */
     public void clearEntireLine() {
-        performClearOperation(() -> {
-            int currentRow = cursor.getRow();
-            logger.info("Очистка всей строки: строка = {}", currentRow + 1);
-            clearLine(currentRow);
-            logger.info("Завершена очистка строки: строка = {}", currentRow + 1);
+        performWithCursorRestore(() -> {
+            int row = cursor.getRow();
+            clearLineWithinMargins(row);
+            logger.debug("EL(2): cleared entire line at row {} (1-based).", row + 1);
         });
     }
 
-    // Очищает от текущей позиции курсора до конца строки
+    /** EL(0): Clear from cursor to end of line (within margins). */
     public void clearFromCursorToEndOfLine() {
-        performClearOperation(() -> {
-            int currentRow = cursor.getRow();
-            int currentColumn = cursor.getColumn();
-
-            int leftMargin = 0;
-            int rightMargin = screenBuffer.getColumns() - 1;
-
-            if (leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-                leftMargin = leftRightMarginModeHandler.getLeftMargin();
-                rightMargin = leftRightMarginModeHandler.getRightMargin();
-            }
-
-            // Убеждаемся, что текущая колонка не выходит за пределы левого поля
-            currentColumn = Math.max(currentColumn, leftMargin);
-
-            logger.info("Очистка строки от позиции курсора до конца строки: строка = {}, начало = столбец {}", currentRow + 1, currentColumn + 1);
-
-            for (int col = currentColumn; col <= rightMargin; col++) {
-                // Устанавливаем ячейку в пробел с дефолтным стилем
-                screenBuffer.setCell(currentRow, col, new Cell(" ", "-fx-fill: white; -rtfx-background-color: transparent;"));
-            }
-
-            logger.info("Завершена очистка строки: строка = {}, от столбца {} до столбца {}", currentRow + 1, currentColumn + 1, rightMargin + 1);
+        performWithCursorRestore(() -> {
+            int row = cursor.getRow();
+            int start = Math.max(cursor.getColumn(), getLeftMargin());
+            int end = getRightMargin();
+            clearRangeInLine(row, start, end);
+            logger.debug("EL(0): cleared row {} from col {} to {} (1-based).", row + 1, start + 1, end + 1);
         });
     }
 
+    /** EL(1): Clear from start of line to cursor (within margins). */
+    public void clearFromStartOfLineToCursor() {
+        performWithCursorRestore(() -> {
+            int row = cursor.getRow();
+            int start = getLeftMargin();
+            int end = Math.min(cursor.getColumn(), getRightMargin());
+            clearRangeInLine(row, start, end);
+            logger.debug("EL(1): cleared row {} from col {} to {} (1-based).", row + 1, start + 1, end + 1);
+        });
+    }
+
+    /**
+     * DL (Delete Lines): delete n lines starting at the cursor row, within the scrolling region.
+     * Lines below shift up; the bottom n lines are cleared (within margins).
+     */
     public void deleteLines(int n) {
+        if (n <= 0) return;
+
         int currentRow = cursor.getRow();
-        int topMargin = scrollingRegionHandler.getWindowStartRow();
-        int bottomMargin = scrollingRegionHandler.getWindowEndRow();
+        int top = scrollingRegionHandler.getWindowStartRow();
+        int bottom = scrollingRegionHandler.getWindowEndRow();
 
-        // Убедимся, что мы в области прокрутки
-        if (currentRow < topMargin || currentRow > bottomMargin) {
-            logger.info("Курсор вне области прокрутки. Удаление строк не выполнено.");
-            return; // Вне области прокрутки, ничего не делаем
+        // Must be inside scrolling region
+        if (currentRow < top || currentRow > bottom) {
+            logger.debug("DL ignored: cursor row {} outside scrolling region {}..{} (1-based).",
+                    currentRow + 1, top + 1, bottom + 1);
+            return;
         }
 
-        // Корректируем n, чтобы не выйти за пределы области прокрутки
-        n = Math.min(n, bottomMargin - currentRow + 1);
+        // Clamp n to available lines in region from currentRow downwards
+        n = Math.min(n, bottom - currentRow + 1);
+        if (n == 0) return;
 
-        logger.info("Удаление {} строк начиная с строки {}", n, currentRow + 1);
+        int left = getLeftMargin();
+        int right = getRightMargin();
 
-        // Получаем левые и правые границы
-        int leftMargin = 0;
-        int rightMargin = screenBuffer.getColumns() - 1;
-
-        if (leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-            leftMargin = leftRightMarginModeHandler.getLeftMargin();
-            rightMargin = leftRightMarginModeHandler.getRightMargin();
-        }
-
-        // Сдвигаем строки вверх внутри области прокрутки и левых/правых полей
-        for (int row = currentRow; row <= bottomMargin - n; row++) {
-            for (int col = leftMargin; col <= rightMargin; col++) {
-                Cell cell = screenBuffer.getCell(row + n, col);
-                screenBuffer.setCell(row, col, cell);
+        // Shift lines up within [currentRow .. bottom - n]
+        for (int row = currentRow; row <= bottom - n; row++) {
+            for (int col = left; col <= right; col++) {
+                Cell src = screenBuffer.getCell(row + n, col);
+                screenBuffer.setCell(row, col, cloneCell(src));
             }
         }
 
-        // Очищаем нижние n строк в области прокрутки и левых/правых полей
-        for (int row = bottomMargin - n + 1; row <= bottomMargin; row++) {
-            clearLine(row, leftMargin, rightMargin);
+        // Clear bottom n lines in region (within margins)
+        for (int row = bottom - n + 1; row <= bottom; row++) {
+            clearRangeInLine(row, left, right);
         }
 
-        logger.info("Удаление строк завершено.");
+        logger.debug("DL: deleted {} line(s) at row {} within region {}..{}, cols {}..{} (1-based).",
+                n, currentRow + 1, top + 1, bottom + 1, left + 1, right + 1);
     }
 
-    private void clearLine(int row) {
-        int leftMargin = 0;
-        int rightMargin = screenBuffer.getColumns() - 1;
+    // -------------------- Internals --------------------
 
-        if (leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-            leftMargin = leftRightMarginModeHandler.getLeftMargin();
-            rightMargin = leftRightMarginModeHandler.getRightMargin();
+    /** Saves the cursor position, runs the operation, then restores the cursor. */
+    private void performWithCursorRestore(Runnable op) {
+        int initialRow = cursor.getRow();
+        int initialCol = cursor.getColumn();
+        try {
+            op.run();
+        } finally {
+            cursor.setPosition(initialRow, initialCol);
         }
-
-        clearLine(row, leftMargin, rightMargin);
     }
 
-    private void clearLine(int row, int leftMargin, int rightMargin) {
-        for (int col = leftMargin; col <= rightMargin; col++) {
-            screenBuffer.setCell(row, col, new Cell(" ", "-fx-fill: white; -rtfx-background-color: transparent;"));
+    /** Clears a full line range ignoring margins (used by ED(2)). */
+    private void clearRangeInLineFullWidth(int row, int startCol, int endCol) {
+        String style = StyleUtils.getDefaultStyle();
+        for (int col = startCol; col <= endCol; col++) {
+            screenBuffer.setCell(row, col, new Cell(" ", style));
         }
-        logger.info("Завершена очистка : строка = {}, от столбца {} до столбца {}", row + 1, leftMargin + 1, rightMargin + 1);
+    }
+
+    /** Clears a line within current margins. */
+    private void clearLineWithinMargins(int row) {
+        clearRangeInLine(row, getLeftMargin(), getRightMargin());
+    }
+
+    /** Clears an inclusive column range in a line (clamped to screen). */
+    private void clearRangeInLine(int row, int startCol, int endCol) {
+        int maxCols = screenBuffer.getColumns();
+        startCol = Math.max(0, Math.min(startCol, maxCols - 1));
+        endCol = Math.max(0, Math.min(endCol,   maxCols - 1));
+        if (endCol < startCol) return;
+
+        String style = StyleUtils.getDefaultStyle();
+        for (int col = startCol; col <= endCol; col++) {
+            screenBuffer.setCell(row, col, new Cell(" ", style));
+        }
+    }
+
+    /** Returns current left margin or 0 if margins disabled. */
+    private int getLeftMargin() {
+        if (leftRightMarginModeHandler != null && leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
+            return Math.max(0, leftRightMarginModeHandler.getLeftMargin());
+        }
+        return 0;
+    }
+
+    /** Returns current right margin or (cols-1) if margins disabled. */
+    private int getRightMargin() {
+        int max = screenBuffer.getColumns() - 1;
+        if (leftRightMarginModeHandler != null && leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
+            return Math.min(max, leftRightMarginModeHandler.getRightMargin());
+        }
+        return max;
+    }
+
+    /** Defensive clone for Cell to avoid aliasing when shifting lines. */
+    private Cell cloneCell(Cell c) {
+        return new Cell(c.character(), c.style());
     }
 }

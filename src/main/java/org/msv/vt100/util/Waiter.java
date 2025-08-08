@@ -34,7 +34,7 @@ public class Waiter {
     }
 
     public static CompletableFuture<Void> waitFor(BooleanSupplier condition) {
-        return waitFor(condition, Duration.ofSeconds(10), Duration.ofMillis(50));
+        return waitFor(condition, Duration.ofSeconds(10), Duration.ofMillis(1000));
     }
 
     public static boolean waitUntil(String debugText, Callable<Boolean> condition) throws InterruptedException {
