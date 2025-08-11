@@ -236,4 +236,9 @@ public class StyleUtils {
         String s = v.toLowerCase();
         return s.equals("true") || s.equals("yes") || s.equals("1") || s.equals("on");
     }
+
+    public static String canonicalize(String style) {
+        if (style == null || style.isBlank()) return "";
+        return buildStyleString(parseStyleString(style));
+    }
 }

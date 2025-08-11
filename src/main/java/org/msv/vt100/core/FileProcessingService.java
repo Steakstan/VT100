@@ -91,4 +91,27 @@ private void showError(String msg) {
         terminalApp.hideProcessingButtons();
     });
 }
+
+    // FileProcessingService.java
+    public void shutdown() {
+        try {
+            // Сигналим общей логике остановку (флаг общий с TerminalApp)
+            isStopped.set(true);
+            isPaused.set(false); // на всякий случай снимаем паузу
+        } catch (Throwable ignore) {}
+
+        // Опционально: закрыть любые UI-хвосты
+        try {
+            Platform.runLater(() -> {
+                try {
+                    terminalApp.hideProcessingButtons();
+                } catch (Throwable ignore2) {
+                    // ничего
+                }
+            });
+        } catch (Throwable ignore) {
+            // ничего
+        }
+    }
+
 }

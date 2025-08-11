@@ -9,14 +9,12 @@ import java.util.List;
 
 /**
  * Manages cursor visibility and blinking.
- *
  * Model:
  * - "Enabled" means the cursor is logically shown (ESC [?25h]) or hidden (ESC [?25l]).
  * - "Blinking" controls whether the visible state toggles over time.
  * - If enabled && !blinking => cursor is continuously visible.
  * - If enabled &&  blinking  => cursor visibility toggles with the configured period.
  * - If !enabled => cursor is invisible regardless of blinking.
- *
  * Listeners are notified whenever the effective visibility may have changed.
  * This class does not render anything; consumers should call {@link #isCursorVisible()}.
  */
@@ -35,7 +33,7 @@ public class CursorVisibilityManager {
     private Timeline blinkTimeline;
 
     /** Blink period (defaults to 500ms). */
-    private Duration blinkPeriod = Duration.millis(500);
+    private final Duration blinkPeriod = Duration.millis(500);
 
     /** Subscribers notified on any visibility-affecting change. */
     private final List<Runnable> visibilityChangeListeners = new ArrayList<>();
@@ -67,53 +65,11 @@ public class CursorVisibilityManager {
         return blinkPhaseOn;
     }
 
-    /** Enables or disables blinking behavior. When disabling, cursor stays visible if enabled. */
-    public void setBlinkingEnabled(boolean blinkingEnabled) {
-        if (this.blinking == blinkingEnabled) return;
-        this.blinking = blinkingEnabled;
-        if (!blinking) {
-            // When blinking is turned off, ensure visible phase if enabled.
-            blinkPhaseOn = true;
-        }
-        updateBlinkTimer();
-        notifyVisibilityChange();
-    }
 
-    /** Sets the blink period; takes effect immediately if blinking is enabled. */
-    public void setBlinkPeriod(Duration period) {
-        if (period == null || period.lessThanOrEqualTo(Duration.ZERO)) return;
-        this.blinkPeriod = period;
-        updateBlinkTimer();
-    }
-
-    /** Starts blinking if enabled; safe to call multiple times. */
-    public void startBlinking() {
-        setBlinkingEnabled(true);
-    }
-
-    /** Stops blinking (cursor remains visible when enabled). */
-    public void stopBlinking() {
-        setBlinkingEnabled(false);
-    }
-
-    /** Adds a listener invoked whenever effective visibility may change. */
-    public void addVisibilityChangeListener(Runnable listener) {
-        if (listener != null) {
-            visibilityChangeListeners.add(listener);
-        }
-    }
 
     /** Initializes the internal timer; safe to call repeatedly. */
     public void initializeCursorBlinking() {
         updateBlinkTimer();
-    }
-
-    /** Disposes internal resources (stop timers). Call on application shutdown. */
-    public void dispose() {
-        if (blinkTimeline != null) {
-            blinkTimeline.stop();
-            blinkTimeline = null;
-        }
     }
 
     // ---- Internals ----
@@ -152,4 +108,18 @@ public class CursorVisibilityManager {
             }
         }
     }
+
+    // CursorVisibilityManager.java
+    public void shutdown() {
+        try {
+            if (blinkTimeline != null) {
+                blinkTimeline.stop();
+                blinkTimeline = null;
+            }
+        } catch (Throwable ignore) {
+            // ничего
+        }
+    }
+
+
 }

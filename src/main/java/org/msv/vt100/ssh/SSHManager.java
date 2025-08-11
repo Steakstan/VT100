@@ -56,12 +56,9 @@ public class SSHManager {
     private final List<Consumer<String>> dataListeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
 
-    // Настройки безопасности/сети
-    private boolean strictHostKeyChecking = true;    // после "обучения" оставляем строгую проверку
     private String knownHostsPath = null;            // если null — используем ~/.ssh/known_hosts
     private int serverAliveIntervalMs = 15_000;
     private int serverAliveCountMax = 3;
-    private boolean forceIPv4 = false;               // опциональный форс IPv4 (ускоряет при проблемах с IPv6)
 
     public SSHManager(SSHConfig config) {
         this.config = Objects.requireNonNull(config, "config");
@@ -96,10 +93,11 @@ public class SSHManager {
         logger.debug("Gesendet: {}", data);
     }
 
-    /** Подписка на входящие данные. Возвращает AutoCloseable для удобной отписки. */
-    public AutoCloseable addDataListener(Consumer<String> listener) {
+    /**
+     * Подписка на входящие данные. Возвращает AutoCloseable для удобной отписки.
+     */
+    public void addDataListener(Consumer<String> listener) {
         dataListeners.add(listener);
-        return () -> dataListeners.remove(listener);
     }
 
     /** Корректно разрывает соединение и останавливает фоновые потоки. */
@@ -117,28 +115,10 @@ public class SSHManager {
 
     /* ===================== НАСТРОЙКИ (флюент) ===================== */
 
-    /** Строгая проверка host key (после "обучения" — да/нет). По умолчанию true. */
-    public SSHManager withStrictHostKeyChecking(boolean strict) {
-        this.strictHostKeyChecking = strict;
-        return this;
-    }
-
-    /** Путь к known_hosts (если не задан — возьмём ~/.ssh/known_hosts). */
-    public SSHManager withKnownHosts(String path) {
-        this.knownHostsPath = path;
-        return this;
-    }
-
     /** Keep-alive параметры. */
     public SSHManager withKeepAlive(int intervalMs, int countMax) {
         this.serverAliveIntervalMs = Math.max(0, intervalMs);
         this.serverAliveCountMax = Math.max(1, countMax);
-        return this;
-    }
-
-    /** Форсировать IPv4 (ускоряет при проблемном IPv6). По умолчанию false. */
-    public SSHManager withForceIPv4(boolean force) {
-        this.forceIPv4 = force;
         return this;
     }
 
@@ -164,25 +144,14 @@ public class SSHManager {
 
         // 3) Хост/адрес назначения
         String sessionHost;
-        if (forceIPv4) {
-            InetAddress[] all = InetAddress.getAllByName(config.host());
-            InetAddress v4 = Arrays.stream(all)
-                    .filter(a -> a instanceof Inet4Address)
-                    .findFirst()
-                    .orElse(all[0]); // если нет IPv4, берём что есть
-            sessionHost = v4.getHostAddress();
-            logger.info("Connecting via IPv4 {} (alias {})", sessionHost, config.host());
-        } else {
-            sessionHost = config.host();
-        }
+        // опциональный форс IPv4 (ускоряет при проблемах с IPv6)
+        boolean forceIPv4 = false;
+        sessionHost = config.host();
 
         // 4) Создаём и настраиваем сессию
         session = jsch.getSession(config.user(), sessionHost, config.port());
 
         // Чтобы ключ в known_hosts сопоставлялся с именем сервера, а не IP (актуально при forceIPv4)
-        if (forceIPv4) {
-            session.setConfig("HostKeyAlias", config.host());
-        }
 
         // Ускоряем — используем только publickey
         session.setConfig("PreferredAuthentications", "publickey");
@@ -196,13 +165,15 @@ public class SSHManager {
         }
 
         // 5) Решаем StrictHostKeyChecking для ЭТОГО подключения
-        String strictThisTime = "yes";
+        String strictThisTime;
         if (khExists) {
             HostKeyRepository repo = jsch.getHostKeyRepository();
             HostKey[] existing = safeGetHostKeys(repo, config.host());
             if (existing != null && existing.length > 0) {
                 // Запись для хоста уже есть → уважаем глобальную настройку
-                strictThisTime = strictHostKeyChecking ? "yes" : "no";
+                // Настройки безопасности/сети
+                // после "обучения" оставляем строгую проверку
+                strictThisTime = "yes";
             } else {
                 // Для этого хоста записи нет → примем ключ и потом сохраним
                 strictThisTime = "no";

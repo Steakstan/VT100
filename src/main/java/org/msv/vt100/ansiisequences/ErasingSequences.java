@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
  * - EL/ECH honor DECVLRM: operations are restricted to [leftMargin..rightMargin].
  * - ED(0) "from cursor to end of screen" and ED(1) "from start to cursor" honor margins horizontally
  *   to match typical app expectations in margin mode (consistent with existing codebase).
- * - ED(2) "entire screen" explicitly ignores L/R margins and clears full width of all rows.
+ * - ED(2) "entire screen" explicitly ignores L/R margins and clears full width of all rows).
  *
  * Scrolling region:
  * - deleteLines (DL) only acts when the cursor is inside the scrolling region and respects DECVLRM horizontally.
@@ -28,6 +28,9 @@ public class ErasingSequences {
     private final ScrollingRegionHandler scrollingRegionHandler;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
 
+    // NEW: используем текущие SGR-атрибуты для стирания
+    private TextFormater textFormater;
+
     public ErasingSequences(ScreenBuffer screenBuffer,
                             Cursor cursor,
                             ScrollingRegionHandler scrollingRegionHandler,
@@ -36,6 +39,11 @@ public class ErasingSequences {
         this.cursor = cursor;
         this.scrollingRegionHandler = scrollingRegionHandler;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
+    }
+
+    /** Inject TextFormater after construction. */
+    public void setTextFormater(TextFormater textFormater) {
+        this.textFormater = textFormater;
     }
 
     // -------------------- Public API (ED/EL/ECH used by dispatcher) --------------------
@@ -179,7 +187,7 @@ public class ErasingSequences {
 
     /** Clears a full line range ignoring margins (used by ED(2)). */
     private void clearRangeInLineFullWidth(int row, int startCol, int endCol) {
-        String style = StyleUtils.getDefaultStyle();
+        String style = eraseStyle();
         for (int col = startCol; col <= endCol; col++) {
             screenBuffer.setCell(row, col, new Cell(" ", style));
         }
@@ -197,7 +205,7 @@ public class ErasingSequences {
         endCol = Math.max(0, Math.min(endCol,   maxCols - 1));
         if (endCol < startCol) return;
 
-        String style = StyleUtils.getDefaultStyle();
+        String style = eraseStyle();
         for (int col = startCol; col <= endCol; col++) {
             screenBuffer.setCell(row, col, new Cell(" ", style));
         }
@@ -223,5 +231,10 @@ public class ErasingSequences {
     /** Defensive clone for Cell to avoid aliasing when shifting lines. */
     private Cell cloneCell(Cell c) {
         return new Cell(c.character(), c.style());
+    }
+
+    /** Style to use when erasing/clearing cells. */
+    private String eraseStyle() {
+        return (textFormater != null) ? textFormater.getEraseFillStyle() : StyleUtils.getDefaultStyle();
     }
 }

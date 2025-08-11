@@ -2,6 +2,8 @@ package org.msv.vt100.ui;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Rectangle2D;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBoxBase;
@@ -9,6 +11,7 @@ import javafx.scene.control.TextInputControl;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import org.msv.vt100.TerminalApp;
@@ -34,6 +37,10 @@ public class CustomTerminalWindow {
     private static final int TOP_BAR_HEIGHT = 30;
     private static final int BOTTOM_BAR_HEIGHT = 30;
 
+    // Максимизация до VisualBounds (без панели задач)
+    private boolean maximizedToWorkArea = false;
+    private double restoreX, restoreY, restoreW, restoreH;
+
     private enum ResizeDirection {
         NONE, NORTH, SOUTH, EAST, WEST, NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST
     }
@@ -48,7 +55,7 @@ public class CustomTerminalWindow {
         terminalCanvas.setFocusTraversable(true);
 
         HBox topBar = createTopBar();
-        OptionalMenuBar optionalMenuBar = new OptionalMenuBar( terminalApp);
+        OptionalMenuBar optionalMenuBar = new OptionalMenuBar(terminalApp);
         optionalMenuBar.getStyleClass().add("optional-menu-topbar");
 
         VBox topContainer = new VBox(topBar, optionalMenuBar);
@@ -67,7 +74,7 @@ public class CustomTerminalWindow {
         scene = new Scene(root, sceneWidth, sceneHeight);
         scene.setFill(Color.TRANSPARENT);
 
-        // ✅ Подключаем все нужные CSS-модули
+        // CSS
         scene.getStylesheets().addAll(
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
@@ -75,6 +82,7 @@ public class CustomTerminalWindow {
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/tabs.css")).toExternalForm()
         );
 
+        // Фокус возвращаем на канвас, если уходит на нерелевантные узлы
         scene.focusOwnerProperty().addListener((obs, oldVal, newVal) -> {
             if (!(newVal instanceof TerminalCanvas ||
                     newVal instanceof TextInputControl ||
@@ -119,16 +127,19 @@ public class CustomTerminalWindow {
 
         Button maximizeButton = new Button("☐");
         maximizeButton.getStyleClass().add("top-bar-button");
-        maximizeButton.setOnAction(event -> {
-            primaryStage.setMaximized(!primaryStage.isMaximized());
-            terminalCanvas.requestFocus();
-        });
+        // Переключаем «максимизацию до рабочей области»
+        maximizeButton.setOnAction(event -> toggleWorkAreaMaximize());
 
         Button closeButton = new Button("X");
         closeButton.getStyleClass().addAll("top-bar-button", "close");
         closeButton.setOnAction(event -> {
             Stage stage = (Stage) root.getScene().getWindow();
             stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
+        });
+
+        // Двойной клик по верхней панели — тоже toggle
+        topBar.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) toggleWorkAreaMaximize();
         });
 
         topBar.getChildren().addAll(spacer, minimizeButton, maximizeButton, closeButton);
@@ -139,7 +150,7 @@ public class CustomTerminalWindow {
         HBox bottomBar = new HBox();
         bottomBar.getStyleClass().add("bottom-bar");
         bottomBar.setPrefHeight(BOTTOM_BAR_HEIGHT);
-        contentPanel = new ContentPanel( terminalApp);
+        contentPanel = new ContentPanel(terminalApp);
         contentPanel.setPrefHeight(BOTTOM_BAR_HEIGHT);
         bottomBar.getChildren().add(contentPanel);
         return bottomBar;
@@ -147,12 +158,14 @@ public class CustomTerminalWindow {
 
     private void enableWindowDragging() {
         root.setOnMousePressed(event -> {
+            if (maximizedToWorkArea) return; // Блокируем перетаскивание, когда «максимизировано»
             if (resizeDir == ResizeDirection.NONE) {
                 xOffset = primaryStage.getX() - event.getScreenX();
                 yOffset = primaryStage.getY() - event.getScreenY();
             }
         });
         root.setOnMouseDragged(event -> {
+            if (maximizedToWorkArea) return;
             if (resizeDir == ResizeDirection.NONE) {
                 primaryStage.setX(event.getScreenX() + xOffset);
                 primaryStage.setY(event.getScreenY() + yOffset);
@@ -161,7 +174,7 @@ public class CustomTerminalWindow {
     }
 
     private void enableWindowResizing() {
-        scene.setOnMouseMoved(event -> scene.setCursor(switch (getResizeDirection(event)) {
+        scene.setOnMouseMoved(event -> scene.setCursor(switch (maximizedToWorkArea ? ResizeDirection.NONE : getResizeDirection(event)) {
             case NORTH, SOUTH -> javafx.scene.Cursor.N_RESIZE;
             case EAST, WEST -> javafx.scene.Cursor.E_RESIZE;
             case NORTH_EAST, SOUTH_WEST -> javafx.scene.Cursor.NE_RESIZE;
@@ -170,6 +183,7 @@ public class CustomTerminalWindow {
         }));
 
         scene.setOnMousePressed(event -> {
+            if (maximizedToWorkArea) return;
             resizeDir = getResizeDirection(event);
             if (resizeDir != ResizeDirection.NONE) {
                 initX = event.getScreenX();
@@ -180,6 +194,7 @@ public class CustomTerminalWindow {
         });
 
         scene.setOnMouseDragged(event -> {
+            if (maximizedToWorkArea) return;
             if (resizeDir != ResizeDirection.NONE) {
                 double dx = event.getScreenX() - initX;
                 double dy = event.getScreenY() - initY;
@@ -233,6 +248,43 @@ public class CustomTerminalWindow {
         if (left) return ResizeDirection.WEST;
         if (right) return ResizeDirection.EAST;
         return ResizeDirection.NONE;
+    }
+
+    private void toggleWorkAreaMaximize() {
+        if (!maximizedToWorkArea) {
+            // Запоминаем текущее положение/размер
+            restoreX = primaryStage.getX();
+            restoreY = primaryStage.getY();
+            restoreW = primaryStage.getWidth();
+            restoreH = primaryStage.getHeight();
+
+            // Выставляем в визуальные границы активного экрана (учитывает панель задач)
+            Screen screen = getCurrentScreen();
+            Rectangle2D vb = screen.getVisualBounds();
+            primaryStage.setX(vb.getMinX());
+            primaryStage.setY(vb.getMinY());
+            primaryStage.setWidth(vb.getWidth());
+            primaryStage.setHeight(vb.getHeight());
+
+            maximizedToWorkArea = true;
+        } else {
+            // Восстанавливаем
+            primaryStage.setX(restoreX);
+            primaryStage.setY(restoreY);
+            primaryStage.setWidth(restoreW);
+            primaryStage.setHeight(restoreH);
+            maximizedToWorkArea = false;
+        }
+        terminalCanvas.requestFocus();
+    }
+
+    private Screen getCurrentScreen() {
+        Rectangle2D wnd = new Rectangle2D(
+                primaryStage.getX(), primaryStage.getY(),
+                Math.max(1, primaryStage.getWidth()),
+                Math.max(1, primaryStage.getHeight())
+        );
+        return Screen.getScreensForRectangle(wnd).stream().findFirst().orElse(Screen.getPrimary());
     }
 
     public ContentPanel getContentPanel() {

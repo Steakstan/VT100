@@ -127,56 +127,6 @@ public class SSHProfileManager {
         }
     }
 
-    /**
-     * Обновить профиль (СОВМЕСТИМЫЙ ВАРИАНТ — как раньше).
-     * Пытаемся:
-     *  1) заменить точное совпадение (без autoConnect),
-     *  2) если нет — заменить единственный профиль с тем же (user, host),
-     *  3) иначе — добавить как новый.
-     */
-    public static void updateProfile(SSHConfig updatedProfile) {
-        Objects.requireNonNull(updatedProfile, "updatedProfile");
-
-        RW.writeLock().lock();
-        try {
-            ProfilesConfig cfg = loadInternal();
-            boolean replaced = false;
-
-            // шаг 1: точное совпадение по sameProfile (user, host, port, keyPath)
-            int idx = indexOfSameProfile(cfg.profiles, updatedProfile);
-            if (idx >= 0) {
-                cfg.profiles.set(idx, updatedProfile);
-                replaced = true;
-            } else {
-                // шаг 2: единственный профиль с тем же user+host
-                List<Integer> sameUH = indexOfSameUserHost(cfg.profiles, updatedProfile.user(), updatedProfile.host());
-                if (sameUH.size() == 1) {
-                    cfg.profiles.set(sameUH.get(0), updatedProfile);
-                    replaced = true;
-                }
-            }
-
-            // автофлаг — обеспечить единственность
-            if (updatedProfile.autoConnect()) {
-                cfg.profiles = disableAutoConnectForAll(cfg.profiles);
-                if (replaced) {
-                    // уже стоит updatedProfile — он и будет авто
-                } else {
-                    // если ещё не добавлен — добавим с авто
-                    cfg.profiles.add(updatedProfile);
-                    replaced = true;
-                }
-            } else if (!replaced) {
-                // просто добавить новый
-                cfg.profiles.add(updatedProfile);
-            }
-
-            saveInternal(cfg);
-        } finally {
-            RW.writeLock().unlock();
-        }
-    }
-
     /** Удалить профиль (сопоставление по sameProfile: user/host/port/keyPath). */
     public static void deleteProfile(SSHConfig profile) {
         Objects.requireNonNull(profile, "profile");
@@ -249,24 +199,6 @@ public class SSHProfileManager {
 
     private static SSHConfig copyWithAuto(SSHConfig p, boolean auto) {
         return new SSHConfig(p.user(), p.host(), p.port(), p.privateKeyPath(), auto);
-    }
-
-    private static int indexOfSameProfile(List<SSHConfig> list, SSHConfig probe) {
-        for (int i = 0; i < list.size(); i++) {
-            if (sameProfile(list.get(i), probe)) return i;
-        }
-        return -1;
-    }
-
-    private static List<Integer> indexOfSameUserHost(List<SSHConfig> list, String user, String host) {
-        List<Integer> idxs = new ArrayList<>();
-        for (int i = 0; i < list.size(); i++) {
-            SSHConfig p = list.get(i);
-            if (p.user().equals(user) && p.host().equals(host)) {
-                idxs.add(i);
-            }
-        }
-        return idxs;
     }
 
     private static List<SSHConfig> disableAutoConnectForAll(List<SSHConfig> src) {

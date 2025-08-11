@@ -20,10 +20,8 @@ import java.util.regex.Pattern;
  * - Coordinates are clamped to the screen. Empty intersection => no-op.
  *
  * Notes:
- * - We do not inherit cell styles from neighbors; we use the default style for filled cells.
- *   This mirrors typical terminal behavior where DECFRA paints with the "current rendition",
- *   but since our current style is applied at character emission, a reasonable default style here avoids
- *   unintended attribute leakage. If needed, this can be extended to accept a style parameter.
+ * - По стандарту DECFRA рисует «current rendition». Поэтому используем текущий стиль TextFormater
+ *   (включая реверс), а не дефолт.
  */
 public class FillRectangularAreaHandler {
 
@@ -32,6 +30,9 @@ public class FillRectangularAreaHandler {
     private final ScreenBuffer screenBuffer;
     private LeftRightMarginModeHandler leftRightMarginModeHandler;
     private ScrollingRegionHandler scrollingRegionHandler;
+
+    // NEW
+    private TextFormater textFormater;
 
     // CSI Pch;Pts;Pls;Pbs;Prs $x
     private static final Pattern CSI_DECFRA =
@@ -48,6 +49,10 @@ public class FillRectangularAreaHandler {
 
     public void setScrollingRegionHandler(ScrollingRegionHandler handler) {
         this.scrollingRegionHandler = handler;
+    }
+
+    public void setTextFormater(TextFormater tf) {
+        this.textFormater = tf;
     }
 
     /**
@@ -118,7 +123,8 @@ public class FillRectangularAreaHandler {
     // ---- internals ----
 
     private void fillArea(int top, int left, int bottom, int right, String ch) {
-        String style = StyleUtils.getDefaultStyle();
+        // используем текущий стиль (включая реверс), чтобы фон был корректный
+        String style = (textFormater != null) ? textFormater.getCurrentStyle() : StyleUtils.getDefaultStyle();
         for (int row = top; row <= bottom; row++) {
             for (int col = left; col <= right; col++) {
                 screenBuffer.setCell(row, col, new Cell(ch, style));

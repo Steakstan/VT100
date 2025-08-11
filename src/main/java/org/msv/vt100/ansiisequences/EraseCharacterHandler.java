@@ -1,8 +1,8 @@
 package org.msv.vt100.ansiisequences;
 
-import org.msv.vt100.core.Cell;
-import org.msv.vt100.core.Cursor;
 import org.msv.vt100.core.ScreenBuffer;
+import org.msv.vt100.core.Cursor;
+import org.msv.vt100.core.Cell;
 import org.msv.vt100.util.StyleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +19,8 @@ import java.util.regex.Pattern;
  * - Honors DECVLRM horizontally: erasure is restricted to [leftMargin..rightMargin] when enabled.
  * - If Pn extends beyond the effective right boundary, it is clamped.
  * - Default Pn is 1 when omitted or non-positive.
+ *
+ * We erase using current background (effective), not default transparent style.
  */
 public class EraseCharacterHandler {
 
@@ -27,6 +29,9 @@ public class EraseCharacterHandler {
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
+
+    // NEW
+    private TextFormater textFormater;
 
     // CSI Pn X (Pn optional)
     private static final Pattern CSI_ECH = Pattern.compile("^\\u001B?\\[(\\d*)X$");
@@ -39,9 +44,11 @@ public class EraseCharacterHandler {
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
     }
 
-    /**
-     * Parses and executes ECH (Erase Character).
-     */
+    public void setTextFormater(TextFormater textFormater) {
+        this.textFormater = textFormater;
+    }
+
+    /** Parses and executes ECH (Erase Character). */
     public void handleEraseCharacterSequence(String sequence) {
         int n = parseCount(sequence);
         if (n <= 0) return;
@@ -63,7 +70,7 @@ public class EraseCharacterHandler {
         // Compute inclusive end column, clamped to right boundary
         int end = Math.min(right, col + n - 1);
 
-        String style = StyleUtils.getDefaultStyle();
+        String style = (textFormater != null) ? textFormater.getEraseFillStyle() : StyleUtils.getDefaultStyle();
         for (int c = col; c <= end; c++) {
             screenBuffer.setCell(row, c, new Cell(" ", style));
         }

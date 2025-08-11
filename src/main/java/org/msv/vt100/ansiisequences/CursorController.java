@@ -9,14 +9,12 @@ import java.util.Map;
 
 /**
  * Controls cursor positioning and character emission into the ScreenBuffer.
- *
  * Responsibilities:
  * - Apply DECOM (relative origin) and DECVLRM (left/right margins) when setting cursor position.
  * - Handle auto-wrap (DECAWM) on character emission.
  * - Implement CR/LF semantics (without writing control glyphs).
  * - Pass text through active charset transformers (DEC Special Graphics, NRCS) before writing.
  * - Merge per-cell style (from TextFormater) with per-line style (from LineAttributeHandler).
- *
  * Notes:
  * - This class does not parse escape sequences; it is called by respective handlers.
  * - ScreenBuffer coordinates are 0-based, inclusive.
@@ -53,18 +51,6 @@ public class CursorController {
         this.rightMargin = screenBuffer.getColumns() - 1;
     }
 
-    public CursorController(Cursor cursor,
-                            ScreenBuffer screenBuffer,
-                            LeftRightMarginModeHandler leftRightMarginModeHandler,
-                            DECOMHandler decomHandler,
-                            LineAttributeHandler lineAttributeHandler,
-                            CharsetSwitchHandler charsetSwitchHandler,
-                            NrcsHandler nrcsHandler,
-                            TextFormater textFormater) {
-        this(cursor, screenBuffer, leftRightMarginModeHandler, decomHandler, lineAttributeHandler);
-        // Prefer using the unified attacher to keep behavior consistent
-        attachTextPipeline(charsetSwitchHandler, nrcsHandler, textFormater);
-    }
 
     /** Attaches text-processing pipeline (charset → NRCS → TextFormater). Safe to call anytime. */
     public void attachTextPipeline(CharsetSwitchHandler charsetSwitchHandler,
@@ -74,11 +60,6 @@ public class CursorController {
         this.nrcsHandler = nrcsHandler;
         this.textFormater = textFormater;
     }
-
-    /** Optional individual setters if you attach in steps. */
-    public void setTextFormater(TextFormater textFormater) { this.textFormater = textFormater; }
-    public void setCharsetSwitchHandler(CharsetSwitchHandler charsetSwitchHandler) { this.charsetSwitchHandler = charsetSwitchHandler; }
-    public void setNrcsHandler(NrcsHandler nrcsHandler) { this.nrcsHandler = nrcsHandler; }
 
     public void setScrollingRegionHandler(ScrollingRegionHandler handler) {
         this.scrollingRegionHandler = handler;
@@ -109,12 +90,12 @@ public class CursorController {
             int lMargin = leftRightMarginModeHandler.isLeftRightMarginModeEnabled() ? leftMargin : 0;
             int rMargin = leftRightMarginModeHandler.isLeftRightMarginModeEnabled() ? rightMargin : maxCols - 1;
 
-            row = clamp(row, 0, bottom - top) + top;
-            col = clamp(col, 0, rMargin - lMargin) + lMargin;
+            row = clamp(row, bottom - top) + top;
+            col = clamp(col, rMargin - lMargin) + lMargin;
         } else {
             int rMargin = leftRightMarginModeHandler.isLeftRightMarginModeEnabled() ? rightMargin : maxCols - 1;
-            row = clamp(row, 0, maxRows - 1);
-            col = clamp(col, 0, rMargin);
+            row = clamp(row, maxRows - 1);
+            col = clamp(col, rMargin);
         }
 
         cursor.setPosition(row, col);
@@ -162,7 +143,7 @@ public class CursorController {
         }
 
         // Guard against out-of-bounds
-        if (!isCursorInBounds()) return;
+        if (isCursorInBounds()) return;
 
         // Skip ISO control characters (not printable)
         if (isControl(ch)) return;
@@ -186,7 +167,7 @@ public class CursorController {
     // ---- internals ----
 
     private void writeGlyphAndAdvance(String glyph) {
-        if (!isCursorInBounds()) return;
+        if (isCursorInBounds()) return;
 
         // Merge per-cell style (from current TextFormater) with per-line style.
         // IMPORTANT: Having a non-null textFormater here is what restores reverse video and other SGR effects.
@@ -225,11 +206,11 @@ public class CursorController {
     private boolean isCursorInBounds() {
         int r = cursor.getRow();
         int c = cursor.getColumn();
-        return r >= 0 && r < screenBuffer.getRows() && c >= 0 && c < screenBuffer.getColumns();
+        return r < 0 || r >= screenBuffer.getRows() || c < 0 || c >= screenBuffer.getColumns();
     }
 
-    private int clamp(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(hi, v));
+    private int clamp(int v, int hi) {
+        return Math.max(0, Math.min(hi, v));
     }
 
     private String combineStyles(String cellStyle, String lineStyle) {

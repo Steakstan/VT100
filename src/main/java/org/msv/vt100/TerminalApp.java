@@ -71,6 +71,8 @@ public class TerminalApp extends Application {
     // --- Render loop control
     private volatile boolean repaintRequested = true; // первый кадр обязателен
     private boolean lastCursorVisible = false;
+    private Timeline screenUpdateTimeline;
+
 
     @Override
     public void start(Stage primaryStage) {
@@ -82,11 +84,17 @@ public class TerminalApp extends Application {
 
             cursorVisibilityManager.showCursor();
 
+            // ✅ Корректное завершение при закрытии окна:
             primaryStage.setOnCloseRequest(event -> {
                 try {
-                    if (sshManager != null) sshManager.disconnect();
-                } catch (Exception e) {
-                    logger.warn("Fehler beim Schließen der SSH-Verbindung: {}", e.getMessage());
+                    shutdownApp(); // централизованный shutdown (идемпотентный)
+                } catch (Throwable t) {
+                    logger.warn("Fehler beim Shutdown: {}", t.getMessage(), t);
+                } finally {
+                    // Корректно закрываем JavaFX
+                    Platform.exit();
+                    // Как страховка от «упрямых» недеамоновых потоков сторонних либ:
+                    System.exit(0);
                 }
             });
 
@@ -192,8 +200,10 @@ public class TerminalApp extends Application {
     }
 
     private void initializeFileProcessingService() {
+        if (sshManager == null) return;
         this.fileProcessingService = new FileProcessingService(sshManager, cursor, this, screenTextDetector, isPaused, isStopped);
     }
+
 
     /* ===================== SSH ===================== */
 
@@ -263,13 +273,61 @@ public class TerminalApp extends Application {
         repaintRequested = true;
     }
 
+    // TerminalApp.java
     private void startScreenUpdater() {
         // 30 FPS достаточно; рисуем только если есть изменения или сменилось состояние курсора
-        Timeline screenUpdateTimeline = new Timeline(
+        screenUpdateTimeline = new Timeline(
                 new KeyFrame(Duration.millis(33), event -> updateScreenIfNeeded())
         );
         screenUpdateTimeline.setCycleCount(Timeline.INDEFINITE);
         screenUpdateTimeline.play();
+    }
+
+
+    /** ✅ Стандартная точка жизненного цикла JavaFX — тоже глушим всё здесь. */
+    @Override
+    public void stop() {
+        shutdownApp();
+    }
+
+    private void shutdownApp() {
+        // 1) Остановить любые пользовательские процессы/потоки обработки
+        try { stopProcessing(); } catch (Exception ignore) {}
+
+        // Если FileProcessingService имеет собственные экзекьюторы — погасим их
+        try {
+            if (fileProcessingService != null) {
+                // Метод добавим в FileProcessingService (см. ниже)
+                fileProcessingService.shutdown();
+            }
+        } catch (Exception e) {
+            logger.debug("FileProcessingService shutdown issue: {}", e.getMessage());
+        }
+
+        // 2) Остановить рендер-луп
+        try {
+            if (screenUpdateTimeline != null) {
+                screenUpdateTimeline.stop();
+                screenUpdateTimeline = null;
+            }
+        } catch (Exception ignore) {}
+
+        // 3) Остановить мигание курсора / таймеры курсора
+        try {
+            if (cursorVisibilityManager != null) {
+                // Метод добавим в CursorVisibilityManager (см. ниже)
+                cursorVisibilityManager.shutdown();
+            }
+        } catch (Exception e) {
+            logger.debug("CursorVisibilityManager shutdown issue: {}", e.getMessage());
+        }
+
+        // 4) Разорвать SSH (он сам глушит свои executors)
+        try {
+            if (sshManager != null && sshManager.isConnected()) {
+                sshManager.disconnect();
+            }
+        } catch (Exception ignore) {}
     }
 
     private void updateScreenIfNeeded() {

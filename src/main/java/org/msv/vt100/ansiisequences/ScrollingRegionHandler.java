@@ -16,6 +16,9 @@ public class ScrollingRegionHandler {
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
     private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler;
 
+    // NEW
+    private TextFormater textFormater;
+
     // Region bounds are 0-based, inclusive
     private int windowStartRow = 0;
     private int windowEndRow;
@@ -31,6 +34,10 @@ public class ScrollingRegionHandler {
         this.leftRightMarginSequenceHandler = leftRightMarginSequenceHandler;
         // Initialize to full screen
         this.windowEndRow = screenBuffer.getRows() - 1;
+    }
+
+    public void setTextFormater(TextFormater textFormater) {
+        this.textFormater = textFormater;
     }
 
     /**
@@ -87,10 +94,7 @@ public class ScrollingRegionHandler {
         }
     }
 
-    /**
-     * Scrolls down within the current region by n lines.
-     * Lines move towards larger row indices; new lines appear at the top.
-     */
+    /** Scrolls down within the current region by n lines. */
     public void scrollDownWithinRegion(int n) {
         if (n <= 0 || windowEndRow < windowStartRow) return;
 
@@ -119,10 +123,7 @@ public class ScrollingRegionHandler {
                 windowStartRow + 1, windowEndRow + 1, left + 1, right + 1, n);
     }
 
-    /**
-     * Scrolls up within the current region by one line.
-     * Lines move towards smaller row indices; a new blank line appears at the bottom.
-     */
+    /** Scrolls up within the current region by one line. */
     public void scrollUpWithinRegion() {
         if (windowEndRow < windowStartRow) return;
 
@@ -145,9 +146,7 @@ public class ScrollingRegionHandler {
                 windowStartRow + 1, windowEndRow + 1, left + 1, right + 1);
     }
 
-    /**
-     * Resets the region to the full screen (1..rows).
-     */
+    /** Resets the region to the full screen (1..rows). */
     public void resetToFullScreen() {
         this.windowStartRow = 0;
         this.windowEndRow = screenBuffer.getRows() - 1;
@@ -194,8 +193,9 @@ public class ScrollingRegionHandler {
     }
 
     private void clearLine(int row, int left, int right) {
+        String style = (textFormater != null) ? textFormater.getEraseFillStyle() : StyleUtils.getDefaultStyle();
         for (int col = left; col <= right; col++) {
-            screenBuffer.setCell(row, col, new Cell(" ", StyleUtils.getDefaultStyle()));
+            screenBuffer.setCell(row, col, new Cell(" ", style));
         }
     }
 

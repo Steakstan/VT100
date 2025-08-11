@@ -1,113 +1,101 @@
 package org.msv.vt100.ui;
 
+import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
-import javafx.geometry.VPos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 import org.msv.vt100.core.Cell;
 import org.msv.vt100.core.ScreenBuffer;
-import org.msv.vt100.util.StyleUtils;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
-/**
- * TerminalCanvas (переписано):
- * - Двойной буфер отображения: сравнение с shadow (lastChars/lastStyles), отрисовываем только "грязные" строки.
- * - Без глобальной очистки: чистим только прямоугольник строки, которую перерисовываем.
- * - Рендер курсора и выделения поверх содержимого, dirty — только затронутые строки.
- * - Стабильные размеры ячейки; пересоздаём шрифты только при реальном изменении высоты ячейки.
- * - Консистентные ключи стиля: fill/background/underline/font-weight (StyleUtils должен нормализовать).
- */
 public class TerminalCanvas extends Canvas {
 
     private final ScreenBuffer screenBuffer;
 
-    // Размеры в ячейках
     private double cellWidth;
     private double cellHeight;
 
-    // Текущее состояние курсора на канвасе (логическое)
     public boolean cursorVisible = true;
     private int cursorRow = -1, cursorCol = -1;
     private int prevCursorRow = -1, prevCursorCol = -1;
     private boolean prevCursorVisible = false;
 
-    // Выделение
-    private Integer selectionStartRow, selectionStartCol;
-    private Integer selectionEndRow, selectionEndCol;
-    private boolean isSelecting = false;
-
-    // Shadow-буфер
     private String[][] lastChars;
-    private String[][] lastStyles; // сериализованный стиль (после нормализации)
-    private boolean[] dirtyRows;
+    private int[][] lastStyleIds;
 
-    // Кэш цветов и шрифтов
-    private final Map<String, Color> colorCache = new HashMap<>();
-    private Font normalFont, boldFont;
-    private double lastFontPixelSize = -1;
+    private final DirtyTracker dirty;
+    private final SelectionModel selection;
+    private final StyleRegistry styles;
+    private final FontManager fonts;
+    private final TerminalRenderer renderer;
 
-    // Контекстное меню
     private ContextMenu contextMenu;
 
-    private String canvasBackground = "transparent"; // или задай свой цвет, если не нужен прозрачный
-
-    public void setCanvasBackground(String cssColor) {
-        this.canvasBackground = (cssColor == null || cssColor.isBlank()) ? "transparent" : cssColor;
-        markAllDirty();
-        updateScreen();
-    }
+    // Единые границы строк: rowEdges[i] = нижняя граница i-й строки в px, длина rows+1
+    private double[] rowEdges;
 
     public TerminalCanvas(ScreenBuffer screenBuffer, double width, double height) {
         super(width, height);
         this.screenBuffer = Objects.requireNonNull(screenBuffer, "screenBuffer");
-
+        this.styles = new StyleRegistry();
+        this.fonts = new FontManager();
+        this.selection = new SelectionModel();
+        this.dirty = new DirtyTracker(screenBuffer.getRows());
         initBuffers();
         recalcCellDimensions(true);
+        recomputeRowEdges();
+        this.renderer = new TerminalRenderer(styles, selection, fonts);
         initMouseHandlers();
         initKeyHandlers();
         initContextMenu();
         initSceneMouseFilter();
-
         setFocusTraversable(true);
         getStyleClass().add("terminal-canvas");
 
-        // Изменение размера канваса — пересчёт геометрии и полная перерисовка только при реальном изменении
         widthProperty().addListener((obs, ov, nv) -> {
-            if (nv.doubleValue() != ov.doubleValue()) {
+            if (!Objects.equals(ov, nv)) {
                 recalcCellDimensions(false);
-                markAllDirty();
+                recomputeRowEdges();
+                dirty.markAllDirty();
                 updateScreen();
             }
         });
         heightProperty().addListener((obs, ov, nv) -> {
-            if (nv.doubleValue() != ov.doubleValue()) {
+            if (!Objects.equals(ov, nv)) {
                 recalcCellDimensions(false);
-                markAllDirty();
+                recomputeRowEdges();
+                dirty.markAllDirty();
                 updateScreen();
             }
         });
     }
-
-    /* ===================== Буферы/геометрия ===================== */
 
     private void initBuffers() {
         int rows = screenBuffer.getRows();
         int cols = screenBuffer.getColumns();
         lastChars = new String[rows][cols];
-        lastStyles = new String[rows][cols];
-        dirtyRows = new boolean[rows];
-        markAllDirty();
+        lastStyleIds = new int[rows][cols];
+        dirty.markAllDirty();
+    }
+
+    private void ensureBuffersSize() {
+        int rows = screenBuffer.getRows();
+        int cols = screenBuffer.getColumns();
+        if (lastChars.length != rows || lastChars[0].length != cols) {
+            lastChars = new String[rows][cols];
+            lastStyleIds = new int[rows][cols];
+            dirty.ensureSize(rows);
+            dirty.markAllDirty();
+            recomputeRowEdges();
+        }
     }
 
     private void recalcCellDimensions(boolean forceDirty) {
@@ -115,7 +103,6 @@ public class TerminalCanvas extends Canvas {
         int rows = screenBuffer.getRows();
         if (cols <= 0 || rows <= 0) return;
 
-        // Подгоняем размер ячейки к целым пикселям для crisp-рендера
         double newCW = Math.floor(getWidth() / cols);
         double newCH = Math.floor(getHeight() / rows);
         if (newCW <= 0 || newCH <= 0) return;
@@ -124,348 +111,184 @@ public class TerminalCanvas extends Canvas {
         cellWidth = newCW;
         cellHeight = newCH;
 
-        // Обновляем шрифты только при изменении высоты ячейки
         if (sizeChanged || forceDirty) {
-            if (cellHeight != lastFontPixelSize) {
-                double px = Math.max(8, Math.floor(cellHeight * 0.8));
-                normalFont = Font.font("Consolas", px);
-                boldFont   = Font.font("Consolas", FontWeight.BOLD, px);
-                lastFontPixelSize = cellHeight;
-                markAllDirty();
+            if (fonts.updateForCellHeight(cellHeight)) {
+                dirty.markAllDirty();
             }
         }
 
-        // Подгоняем физический размер канваса под целые ячейки (минимум изменений)
         double targetW = Math.floor(cellWidth * cols);
         double targetH = Math.floor(cellHeight * rows);
         if (Math.abs(getWidth() - targetW) >= 1.0) setWidth(targetW);
         if (Math.abs(getHeight() - targetH) >= 1.0) setHeight(targetH);
     }
 
-    public void markAllDirty() {
-        for (int r = 0; r < dirtyRows.length; r++) dirtyRows[r] = true;
+    private void recomputeRowEdges() {
+        int rows = screenBuffer.getRows();
+        if (rows <= 0) return;
+        if (rowEdges == null || rowEdges.length != rows + 1) {
+            rowEdges = new double[rows + 1];
+        }
+        rowEdges[0] = 0.0;
+        for (int i = 1; i <= rows; i++) {
+            // Единый снап вниз, чтобы все потребители имели одни и те же границы
+            rowEdges[i] = Math.floor(i * cellHeight);
+        }
     }
 
     private void markRowDirty(int r) {
-        if (r >= 0 && r < dirtyRows.length) dirtyRows[r] = true;
+        // Расширяем грязь на вертикальных соседей, чтобы убирать межкадровые гонки
+        dirty.markRowDirty(r);
+        if (r - 1 >= 0) dirty.markRowDirty(r - 1);
+        if (r + 1 < screenBuffer.getRows()) dirty.markRowDirty(r + 1);
     }
 
-    private void markSelectionRangeDirty(Integer startRow, Integer endRow) {
-        if (startRow == null || endRow == null) return;
-        int rows = screenBuffer.getRows();
-        int from = Math.max(0, Math.min(startRow, endRow));
-        int to   = Math.min(rows - 1, Math.max(startRow, endRow));
-        for (int r = from; r <= to; r++) dirtyRows[r] = true;
-        if (to + 1 < rows) dirtyRows[to + 1] = true; // захватываем +1 снизу, без выхода за границу
-    }
-
-
-    /* ===================== Основной апдейт ===================== */
-
-    /**
-     * Сверяем committed-экран с shadow и перерисовываем только изменившиеся строки.
-     * Также учитываем курсор и выделение.
-     */
     public void updateScreen() {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(this::updateScreen);
+            return;
+        }
+        ensureBuffersSize();
         recalcCellDimensions(false);
+        recomputeRowEdges();
 
         final int rows = screenBuffer.getRows();
         final int cols = screenBuffer.getColumns();
         final GraphicsContext gc = getGraphicsContext2D();
+        gc.setTextAlign(TextAlignment.CENTER);
 
-        // 1) Дифф по содержимому
+        // Дифф-скан по чистым строкам: если содержимое изменилось — метим строку грязной (и, через markRowDirty, соседей)
         for (int r = 0; r < rows; r++) {
-            if (dirtyRows[r]) continue;
+            if (dirty.isRowDirty(r)) continue;
             for (int c = 0; c < cols; c++) {
                 Cell cell = screenBuffer.getVisibleCell(r, c);
                 String ch = cell.character();
-                String st = normalizeStyle(cell.style());
-                if (!equalsNullSafe(ch, lastChars[r][c]) || !equalsNullSafe(st, lastStyles[r][c])) {
-                    dirtyRows[r] = true;
+                int stId = styles.styleIdFor(cell.style());
+                if (!Objects.equals(ch, lastChars[r][c]) || stId != lastStyleIds[r][c]) {
+                    markRowDirty(r);
                     break;
                 }
             }
         }
 
-        // 2) Курсор → грязним старую и новую строки
-        if (cursorVisible != prevCursorVisible ||
-                cursorRow != prevCursorRow || cursorCol != prevCursorCol) {
+        // Курсор: инвалидация текущей/предыдущей строки (и их соседей через markRowDirty)
+        if (cursorVisible != prevCursorVisible || cursorRow != prevCursorRow || cursorCol != prevCursorCol) {
             markRowDirty(prevCursorRow);
             markRowDirty(cursorRow);
         }
 
-        // 3) Расширяем dirty-зону на одну строку вниз
-        for (int r = rows - 2; r >= 0; r--) {
-            if (dirtyRows[r]) dirtyRows[r + 1] = true;
-        }
+        // Сбор «полос» (bands) из смежных грязных строк с расширением на соседа вверх/вниз
+        List<int[]> bands = new ArrayList<>();
+        for (int r = 0; r < rows; ) {
+            if (!dirty.isRowDirty(r)) { r++; continue; }
+            int start = r;
+            while (r < rows && dirty.isRowDirty(r)) r++;
+            int end = r - 1;
 
-        // 4) Рендер dirty-строк
-        for (int r = 0; r < rows; r++) {
-            if (!dirtyRows[r]) continue;
+            int ns = Math.max(0, start - 1);
+            int ne = Math.min(rows - 1, end + 1);
 
-            double y = r * cellHeight;
-            double h = cellHeight;
-
-            // ROW CLEAR: очищаем старое содержимое строки
-            if ("transparent".equalsIgnoreCase(canvasBackground)) {
-                gc.clearRect(0, y, getWidth(), h);                // в прозрачность
+            // Сливаем с предыдущей полосой при перекрытии/соприкосновении
+            if (!bands.isEmpty()) {
+                int[] last = bands.get(bands.size() - 1);
+                if (ns <= last[1] + 1) {
+                    last[1] = Math.max(last[1], ne);
+                } else {
+                    bands.add(new int[]{ns, ne});
+                }
             } else {
-                gc.setFill(getCachedColor(canvasBackground));     // в базовый цвет канваса
-                gc.fillRect(0, y, getWidth(), h);
+                bands.add(new int[]{ns, ne});
             }
-
-            // Рисуем ячейки строки
-            for (int c = 0; c < cols; c++) {
-                renderCell(gc, r, c);
-            }
-
-            // Обновляем shadow
-            for (int c = 0; c < cols; c++) {
-                Cell cell = screenBuffer.getVisibleCell(r, c);
-                lastChars[r][c]  = cell.character();
-                lastStyles[r][c] = normalizeStyle(cell.style());
-            }
-
-            dirtyRows[r] = false;
         }
 
-        // 5) Курсор поверх всего
-        drawCursorOverlay(gc);
+        // Если нет работы — только курсор мог измениться; он уже покрыт через markRowDirty выше
+        if (bands.isEmpty()) {
+            prevCursorRow = cursorRow;
+            prevCursorCol = cursorCol;
+            prevCursorVisible = cursorVisible;
+            return;
+        }
+
+        // Рендер по полосам: прозрачная очистка + клип полосы + рисуем все строки в ней
+        for (int[] band : bands) {
+            int start = band[0];
+            int end = band[1];
+
+            double y0 = Math.max(0, Math.floor(rowEdges[start]) - 1);
+            double y1 = Math.min(getHeight(), Math.ceil(rowEdges[end + 1]) + 1);
+            double bandH = y1 - y0;
+
+            // Прозрачная очистка ТОЛЬКО области полосы
+            gc.clearRect(0, y0, getWidth(), bandH);
+
+            // Клип, чтобы никакая другая очистка не «срезала» оверсцан
+            gc.save();
+            gc.beginPath();
+            gc.rect(0, y0, getWidth(), bandH);
+            gc.clip();
+
+            // Рисуем строки внутри полосы
+            for (int r = start; r <= end; r++) {
+                renderer.renderBackgroundRuns(gc, screenBuffer, r, cellWidth, cellHeight, getWidth(), getHeight());
+                renderer.renderSelectionOverlay(gc, r, cellWidth, cellHeight, screenBuffer.getColumns());
+                renderer.renderTextAndUnderline(gc, screenBuffer, r, cellWidth, cellHeight);
+                renderer.renderBoxChars(gc, screenBuffer, r, cellWidth, cellHeight);
+
+                // Обновляем кэш для всей строки
+                for (int c = 0; c < cols; c++) {
+                    Cell cell = screenBuffer.getVisibleCell(r, c);
+                    lastChars[r][c] = cell.character();
+                    lastStyleIds[r][c] = styles.styleIdFor(cell.style());
+                }
+                dirty.clearRow(r);
+            }
+
+            gc.restore();
+        }
+
+        // Курсор поверх всего
+        renderer.drawCursorOverlay(gc, screenBuffer, cursorVisible, cursorRow, cursorCol, cellWidth, cellHeight);
 
         prevCursorRow = cursorRow;
         prevCursorCol = cursorCol;
         prevCursorVisible = cursorVisible;
     }
 
-
-
-
-    private void renderCell(GraphicsContext gc, int row, int col) {
-        Cell cell = screenBuffer.getVisibleCell(row, col);
-        Map<String, String> style = StyleUtils.parseStyleString(normalizeStyle(cell.style()));
-
-        String fillColor = style.getOrDefault("fill", "white");
-        String bgColor   = style.getOrDefault("background", "transparent");
-        boolean underline = "true".equalsIgnoreCase(style.getOrDefault("underline", "false"));
-        boolean bold      = "bold".equalsIgnoreCase(style.getOrDefault("font-weight", "normal"));
-
-        double x = col * cellWidth;
-        double y = row * cellHeight;
-        double w = cellWidth;
-        double h = cellHeight;
-
-        // ФОН: перекрываем только по X (±1 px), по Y — ровно
-        if (!"transparent".equalsIgnoreCase(bgColor)) {
-            gc.setFill(getCachedColor(bgColor));
-
-            double ox = Math.max(0, x - 1);
-            double oy = Math.max(0, y - 1);
-            double ow = Math.min(getWidth()  - ox, w + 2);
-            double oh = Math.min(getHeight() - oy, h + 2);
-
-            gc.fillRect(ox, oy, ow, oh);
-        }
-
-        // Псевдографика?
-        String ch = cell.character();
-        if (isBoxDrawingChar(ch)) {
-            drawBoxCharacter(gc, ch.charAt(0), x, y, w, h, fillColor, false /* isCursor - больше не здесь */);
-        } else {
-            if (ch != null && !ch.isBlank()) {
-                gc.setFont(bold ? boldFont : normalFont);
-                gc.setFill(getCachedColor(fillColor));
-                gc.setTextAlign(TextAlignment.CENTER);
-                gc.setTextBaseline(VPos.CENTER);
-                gc.fillText(ch, x + w / 2.0, y + h / 2.0);
-            }
-            if (underline) {
-                gc.setStroke(getCachedColor(fillColor));
-                gc.setLineWidth(1);
-                gc.strokeLine(x, y + h - 1, x + w, y + h - 1);
-            }
-        }
-    }
-
-
-
-    /* ===================== Псевдографика ===================== */
-
-    private boolean isBoxDrawingChar(String ch) {
-        return ch != null && ch.length() == 1 && "┌┐└┘├┤┬┴┼│─".indexOf(ch.charAt(0)) >= 0;
-    }
-
-    private void drawCursorOverlay(GraphicsContext gc) {
-        if (!cursorVisible || cursorRow < 0 || cursorCol < 0) return;
-
-        // Берём цвет обводки из текущего стиля ячейки под курсором (как раньше)
-        Cell cell = screenBuffer.getVisibleCell(cursorRow, cursorCol);
-        Map<String, String> style = StyleUtils.parseStyleString(normalizeStyle(cell.style()));
-        String fillColor = style.getOrDefault("fill", "white");
-
-        double x = cursorCol * cellWidth;
-        double y = cursorRow * cellHeight;
-        double w = cellWidth;
-        double h = cellHeight;
-
-        gc.setFill(getCachedColor(fillColor));
-        // Четыре 1-px полосы по периметру — строго по целым координатам
-        gc.fillRect(x,       y,       w, 1);   // top
-        gc.fillRect(x,       y+h-1,   w, 1);   // bottom
-        gc.fillRect(x,       y,       1, h);   // left
-        gc.fillRect(x+w-1,   y,       1, h);   // right
-    }
-
-
-    private void drawBoxCharacter(GraphicsContext gc,
-                                  char c, double x, double y, double w, double h,
-                                  String fillColor, boolean isCursor) {
-        Color lineColor = getCachedColor(fillColor);
-        if (isCursor) lineColor = lineColor.brighter();
-
-        gc.setStroke(lineColor);
-        gc.setLineWidth(1.5);
-
-        double left = Math.floor(x) + 0.5;
-        double top = Math.floor(y) + 0.5;
-        double right = Math.floor(x + w) - 0.5;
-        double bottom = Math.floor(y + h) - 0.5;
-        double midX = Math.floor((x + x + w) / 2.0) + 0.5;
-        double midY = Math.floor((y + y + h) / 2.0) + 0.5;
-
-        switch (c) {
-            case '─' -> gc.strokeLine(left, midY, right, midY);
-            case '│' -> gc.strokeLine(midX, top, midX, bottom);
-            case '┌' -> { gc.strokeLine(midX, midY, right, midY); gc.strokeLine(midX, midY, midX, bottom); }
-            case '┐' -> { gc.strokeLine(left, midY, midX, midY); gc.strokeLine(midX, midY, midX, bottom); }
-            case '└' -> { gc.strokeLine(midX, top, midX, midY); gc.strokeLine(midX, midY, right, midY); }
-            case '┘' -> { gc.strokeLine(midX, top, midX, midY); gc.strokeLine(left, midY, midX, midY); }
-            case '├' -> { gc.strokeLine(midX, midY, right, midY); gc.strokeLine(midX, top, midX, bottom); }
-            case '┤' -> { gc.strokeLine(left, midY, midX, midY); gc.strokeLine(midX, top, midX, bottom); }
-            case '┬' -> { gc.strokeLine(left, midY, right, midY); gc.strokeLine(midX, midY, midX, bottom); }
-            case '┴' -> { gc.strokeLine(left, midY, right, midY); gc.strokeLine(midX, top, midX, midY); }
-            case '┼' -> { gc.strokeLine(left, midY, right, midY); gc.strokeLine(midX, top, midX, bottom); }
-        }
-
-        // Рамка курсора поверх (если нужно)
-        if (isCursor) {
-            gc.setStroke(lineColor);
-            gc.setLineWidth(2);
-            gc.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-        }
-    }
-
-    /* ===================== Цвета ===================== */
-
-    private Color getCachedColor(String cssHexOrName) {
-        String key = cssHexOrName.toLowerCase();
-        return colorCache.computeIfAbsent(key, k -> Color.web(cssHexOrName, 1.0));
-    }
-
-    /* ===================== Выделение/копирование ===================== */
-
-    private boolean isWithinSelection(int row, int col) {
-        if (selectionStartRow == null || selectionEndRow == null) return false;
-        int sr = Math.min(selectionStartRow, selectionEndRow);
-        int er = Math.max(selectionStartRow, selectionEndRow);
-        int sc = Math.min(selectionStartCol, selectionEndCol);
-        int ec = Math.max(selectionStartCol, selectionEndCol);
-        return row >= sr && row <= er && col >= sc && col <= ec;
-    }
-
-    private void beginSelection(double x, double y) {
-        clearSelectionInternal(false);
-        selectionStartCol = (int) (x / cellWidth);
-        selectionStartRow = (int) (y / cellHeight);
-        selectionEndCol = selectionStartCol;
-        selectionEndRow = selectionStartRow;
-        isSelecting = true;
-        markRowDirty(selectionStartRow);
-    }
-
-    private void updateSelection(double x, double y) {
-        int oldEndRow = selectionEndRow == null ? -1 : selectionEndRow;
-        int oldEndCol = selectionEndCol == null ? -1 : selectionEndCol;
-
-        int newEndCol = (int) (x / cellWidth);
-        int newEndRow = (int) (y / cellHeight);
-
-        if (newEndCol != oldEndCol) {
-            markRowDirty(selectionEndRow);
-        }
-        if (newEndRow != oldEndRow) {
-            markSelectionRangeDirty(selectionStartRow, oldEndRow);
-            markSelectionRangeDirty(selectionStartRow, newEndRow);
-        }
-
-        selectionEndCol = newEndCol;
-        selectionEndRow = newEndRow;
-    }
-
-    private void endSelection(double x, double y) {
-        updateSelection(x, y);
-        isSelecting = false;
-        markSelectionRangeDirty(selectionStartRow, selectionEndRow);
-    }
-
-    public void clearSelection() {
-        clearSelectionInternal(true);
-    }
-
-    private void clearSelectionInternal(boolean markDirty) {
-        if (markDirty && selectionStartRow != null && selectionEndRow != null) {
-            markSelectionRangeDirty(selectionStartRow, selectionEndRow);
-        }
-        selectionStartRow = selectionStartCol = null;
-        selectionEndRow   = selectionEndCol   = null;
-    }
-
-    public String getSelectedText() {
-        if (selectionStartRow == null || selectionEndRow == null) return "";
-        int sr = Math.min(selectionStartRow, selectionEndRow);
-        int er = Math.max(selectionStartRow, selectionEndRow);
-        int sc = Math.min(selectionStartCol, selectionEndCol);
-        int ec = Math.max(selectionStartCol, selectionEndCol);
-        StringBuilder sb = new StringBuilder();
-        for (int r = sr; r <= er; r++) {
-            for (int c = sc; c <= ec; c++) {
-                sb.append(screenBuffer.getVisibleCell(r, c).character());
-            }
-            if (r < er) sb.append("\n");
-        }
-        return sb.toString();
-    }
-
-    /* ===================== Ввод/контекстное меню ===================== */
-
     private void initMouseHandlers() {
         setOnMousePressed(e -> {
             if (e.getButton() == MouseButton.PRIMARY) {
-                beginSelection(e.getX(), e.getY());
+                selection.beginSelection(e.getX(), e.getY(), cellWidth, cellHeight, dirty);
                 updateScreen();
             }
             e.consume();
         });
-
         setOnMouseDragged(e -> {
-            if (isSelecting) {
-                updateSelection(e.getX(), e.getY());
+            if (selection.isSelecting()) {
+                selection.updateSelection(e.getX(), e.getY(), cellWidth, cellHeight, dirty);
                 updateScreen();
             }
             e.consume();
         });
-
         setOnMouseReleased(e -> {
-            if (isSelecting) {
-                endSelection(e.getX(), e.getY());
+            if (selection.isSelecting()) {
+                selection.endSelection(e.getX(), e.getY(), cellWidth, cellHeight, dirty);
                 updateScreen();
             }
             e.consume();
         });
-
-        setOnContextMenuRequested(e -> {
-            if (contextMenu != null) {
-                contextMenu.show(this, e.getScreenX(), e.getScreenY());
+        setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                if (e.getClickCount() == 2) {
+                    selection.selectWordAt(e.getX(), e.getY(), cellWidth, cellHeight, screenBuffer, dirty);
+                    updateScreen();
+                } else if (e.getClickCount() == 3) {
+                    selection.selectRowAt(e.getY(), cellHeight, screenBuffer, dirty);
+                    updateScreen();
+                }
             }
+        });
+        setOnContextMenuRequested(e -> {
+            if (contextMenu != null) contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
         });
     }
@@ -477,12 +300,16 @@ public class TerminalCanvas extends Canvas {
                 return;
             }
             if (e.isControlDown() && e.getCode() == KeyCode.C) {
-                String selectedText = getSelectedText();
-                if (!selectedText.isEmpty()) {
+                String text = selection.getSelectedText(screenBuffer);
+                if (!text.isEmpty()) {
                     ClipboardContent content = new ClipboardContent();
-                    content.putString(selectedText);
+                    content.putString(text);
                     Clipboard.getSystemClipboard().setContent(content);
                 }
+                e.consume();
+            } else if (e.isControlDown() && e.getCode() == KeyCode.A) {
+                selection.selectAll(screenBuffer.getRows(), screenBuffer.getColumns(), dirty);
+                updateScreen();
                 e.consume();
             }
         });
@@ -490,22 +317,25 @@ public class TerminalCanvas extends Canvas {
 
     private void initContextMenu() {
         contextMenu = new ContextMenu();
-        Label label = new Label("Kopieren");
-        label.getStyleClass().add("copy-button-label");
-        StackPane container = new StackPane(label);
-        container.getStyleClass().add("copy-button-container");
-
+        Label copyLabel = new Label("Kopieren");
+        copyLabel.getStyleClass().add("buttons");
+        StackPane copyContainer = new StackPane(copyLabel);
+        copyContainer.getStyleClass().add("copy-button-container");
         MenuItem copyItem = new MenuItem();
-        copyItem.setGraphic(container);
+        copyItem.setGraphic(copyContainer);
         copyItem.setOnAction(e -> {
-            String selected = getSelectedText();
-            if (!selected.isEmpty()) {
+            String text = selection.getSelectedText(screenBuffer);
+            if (!text.isEmpty()) {
                 ClipboardContent content = new ClipboardContent();
-                content.putString(selected);
+                content.putString(text);
                 Clipboard.getSystemClipboard().setContent(content);
             }
         });
-        contextMenu.getItems().add(copyItem);
+        MenuItem selectAllItem = new MenuItem("Alles auswählen");
+        selectAllItem.setOnAction(e -> { selection.selectAll(screenBuffer.getRows(), screenBuffer.getColumns(), dirty); updateScreen(); });
+        MenuItem clearSelItem = new MenuItem("Auswahl aufheben");
+        clearSelItem.setOnAction(e -> { selection.clearSelection(dirty); updateScreen(); });
+        contextMenu.getItems().addAll(copyItem, selectAllItem, clearSelItem);
     }
 
     private void initSceneMouseFilter() {
@@ -521,17 +351,13 @@ public class TerminalCanvas extends Canvas {
         });
     }
 
-    /* ===================== Публичный API для курсора ===================== */
+    public String getSelectedText() {
+        return selection.getSelectedText(screenBuffer);
+    }
 
     public void setCursorPosition(int row, int col) {
-        if (row != cursorRow) {
-            markRowDirty(cursorRow);
-            markRowDirty(row);
-        }
-        if (col != cursorCol) {
-            markRowDirty(cursorRow);
-            markRowDirty(row);
-        }
+        if (row != cursorRow) { markRowDirty(cursorRow); markRowDirty(row); }
+        if (col != cursorCol) { markRowDirty(cursorRow); markRowDirty(row); }
         this.cursorRow = row;
         this.cursorCol = col;
     }
@@ -541,38 +367,5 @@ public class TerminalCanvas extends Canvas {
             this.cursorVisible = visible;
             markRowDirty(cursorRow);
         }
-    }
-
-    /* ===================== Утилиты ===================== */
-
-    public void forceFullRedraw() {
-        markAllDirty();
-        updateScreen();
-    }
-
-    /** Вызывайте на тик мигания курсора — грязним только две строки (старая/новая). */
-    public void onBlinkTick() {
-        markRowDirty(cursorRow);
-        markRowDirty(prevCursorRow);
-        updateScreen();
-    }
-
-    private boolean equalsNullSafe(Object a, Object b) {
-        return (a == b) || (a != null && a.equals(b));
-    }
-
-    /**
-     * Нормализуем строку стиля:
-     * - приводим возможные ключи к каноническим: fill/background/underline/font-weight
-     * - убираем лишние пробелы
-     * Прим.: StyleUtils.parseStyleString должен поддерживать и старые ключи (-fx-fill, -rtfx-background-color) → map в новые.
-     */
-    private String normalizeStyle(String raw) {
-        if (raw == null || raw.isBlank()) return "fill: white; background: transparent;";
-        // Мини-санитайзер: трим и одинарные пробелы после ';'
-        String s = raw.trim().replaceAll("\\s*;\\s*", "; ").replaceAll("\\s*:\\s*", ": ");
-        // Не насильно переписываем ключи здесь — парсер занимается маппингом,
-        // но нормализованная строка поможет для equals и кэша.
-        return s;
     }
 }

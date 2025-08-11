@@ -26,6 +26,9 @@ public class InsertLineHandler {
     private final ScrollingRegionHandler scrollingRegionHandler;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
 
+    // NEW
+    private TextFormater textFormater;
+
     // CSI Pn L (Pn optional, default 1)
     private static final Pattern CSI_IL = Pattern.compile("^\\u001B?\\[(\\d*)L$");
 
@@ -37,6 +40,10 @@ public class InsertLineHandler {
         this.cursor = cursor;
         this.scrollingRegionHandler = scrollingRegionHandler;
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
+    }
+
+    public void setTextFormater(TextFormater textFormater) {
+        this.textFormater = textFormater;
     }
 
     /**
@@ -123,15 +130,16 @@ public class InsertLineHandler {
         // Move content down bottom-up; deep-copy cells to avoid aliasing
         for (int row = toRow; row >= fromRow + n; row--) {
             for (int col = left; col <= right; col++) {
-                Cell src = screenBuffer.getCell(row - n, col);
+                org.msv.vt100.core.Cell src = screenBuffer.getCell(row - n, col);
                 screenBuffer.setCell(row, col, cloneCell(src));
             }
         }
     }
 
     private void clearLine(int row, int left, int right) {
+        String style = (textFormater != null) ? textFormater.getEraseFillStyle() : StyleUtils.getDefaultStyle();
         for (int col = left; col <= right; col++) {
-            screenBuffer.setCell(row, col, new Cell(" ", StyleUtils.getDefaultStyle()));
+            screenBuffer.setCell(row, col, new Cell(" ", style));
         }
     }
 

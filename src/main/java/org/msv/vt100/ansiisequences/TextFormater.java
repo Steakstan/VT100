@@ -327,4 +327,35 @@ public class TextFormater {
     public String getCurrentStyle() {
         return currentStyle;
     }
+
+    public String getEffectiveForeground() {  // с учётом REVERSE/CONCEAL
+        String effFg = currentForeground != null ? currentForeground : DEFAULT_FG;
+        String effBg = currentBackground != null ? currentBackground : DEFAULT_BG;
+        if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
+            String swapBg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
+            effBg = effFg;            // фон становится прежним fg
+            effFg = swapBg;           // текст — прежний bg (с подменой transparent->black)
+        }
+        if (activeFormats.contains(TextFormatMode.CONCEAL)) {
+            effFg = "transparent";
+        }
+        return effFg;
+    }
+
+    public String getEffectiveBackground() {  // то же, но возврат bg
+        String effFg = currentForeground != null ? currentForeground : DEFAULT_FG;
+        String effBg = currentBackground != null ? currentBackground : DEFAULT_BG;
+        if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
+            effBg = effFg; // при реверсе фон = прежний fg
+        }
+        return effBg;
+    }
+
+    /** Стиль для «заливки фоном» при стирании/вставке/прокрутке */
+    public String getEraseFillStyle() {
+        String bg = getEffectiveBackground();
+        // для пробела нам важен именно фон; fill можно оставить любым
+        return "fill: " + getEffectiveForeground() + "; background: " + bg + "; underline: false; font-weight: normal;";
+    }
+
 }

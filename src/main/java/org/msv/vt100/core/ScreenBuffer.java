@@ -185,4 +185,11 @@ public class ScreenBuffer {
             this.dirtyRows = dirtyRows;
         }
     }
+
+    public Cell[] getVisibleRow(int row) {
+        if (row < 0 || row >= rows) {
+            throw new IndexOutOfBoundsException("Invalid row: " + row);
+        }
+        return page().committed[row];
+    }
 }

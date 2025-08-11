@@ -6,7 +6,11 @@ import java.util.function.BooleanSupplier;
 
 public class Waiter {
     private static final ScheduledExecutorService scheduler =
-            Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
+            Executors.newScheduledThreadPool(
+                    Math.max(2, Runtime.getRuntime().availableProcessors()/2),
+                    r -> { Thread t = new Thread(r, "waiter-scheduler"); t.setDaemon(true); return t; }
+            );
+    public static void shutdown() { scheduler.shutdownNow(); }
 
     public static CompletableFuture<Void> waitFor(BooleanSupplier condition, Duration timeout, Duration interval) {
         CompletableFuture<Void> future = new CompletableFuture<>();

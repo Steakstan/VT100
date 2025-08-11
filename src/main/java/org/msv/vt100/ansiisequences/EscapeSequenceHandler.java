@@ -23,13 +23,12 @@ public class EscapeSequenceHandler {
     private final CursorController cursorController;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
     private final LeftRightMarginSequenceHandler leftRightMarginSequenceHandler;
-    private final DECCRASequenceHandler deccraSequenceHandler; // Новый обработчик
+    private final DECCRASequenceHandler deccraSequenceHandler;
     private final EraseCharacterHandler eraseCharacterHandler;
     private final FillRectangularAreaHandler fillRectangularAreaHandler;
     private final Cursor cursor;
     private final LineAttributeHandler lineAttributeHandler;
     private final InsertLineHandler insertLineHandler;
-
 
     public EscapeSequenceHandler(
             ErasingSequences erasingSequences,
@@ -50,6 +49,7 @@ public class EscapeSequenceHandler {
             ScreenBuffer screenBuffer,
             LeftRightMarginSequenceHandler leftRightMarginSequenceHandler,
             InsertLineHandler insertLineHandler) {
+
         this.erasingSequences = erasingSequences;
         this.cursorMovementHandler = cursorMovementHandler;
         this.decomHandler = decomHandler;
@@ -62,8 +62,6 @@ public class EscapeSequenceHandler {
         this.leftRightMarginModeHandler = leftRightMarginModeHandler;
         this.eraseCharacterHandler = eraseCharacterHandler;
         this.fillRectangularAreaHandler = fillRectangularAreaHandler;
-        this.fillRectangularAreaHandler.setLeftRightMarginModeHandler(leftRightMarginModeHandler);
-        this.fillRectangularAreaHandler.setScrollingRegionHandler(scrollingRegionHandler);
         this.cursor = cursor;
         this.lineAttributeHandler = lineAttributeHandler;
         this.deccraSequenceHandler = new DECCRASequenceHandler(
@@ -72,6 +70,17 @@ public class EscapeSequenceHandler {
         );
         this.leftRightMarginSequenceHandler = leftRightMarginSequenceHandler;
         this.insertLineHandler = insertLineHandler;
+
+        // NEW: протягиваем TextFormater во все места, где есть заливки/очистки
+        this.erasingSequences.setTextFormater(textFormater);
+        this.insertLineHandler.setTextFormater(textFormater);
+        this.scrollingRegionHandler.setTextFormater(textFormater);
+        this.eraseCharacterHandler.setTextFormater(textFormater);
+        this.fillRectangularAreaHandler.setTextFormater(textFormater);
+
+        // FillRectangularAreaHandler уже привязывается к режимам
+        this.fillRectangularAreaHandler.setLeftRightMarginModeHandler(leftRightMarginModeHandler);
+        this.fillRectangularAreaHandler.setScrollingRegionHandler(scrollingRegionHandler);
     }
 
     // Method to process a completed escape sequence
