@@ -18,19 +18,11 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-/**
- * SSHManager — управление SSH-сессией (JSch) с:
- * - автоматическим приёмом и сохранением HostKey при первом подключении (если записи нет),
- * - строгой проверкой HostKey на последующих сеансах,
- * - PreferredAuthentications=publickey (быстрее),
- * - опциональным форсированием IPv4 + HostKeyAlias,
- * - безопасной остановкой и асинхронным чтением,
- * - keep-alive.
- */
+
 public class SSHManager {
     private static final Logger logger = LoggerFactory.getLogger(SSHManager.class);
 
-    // Рекомендованные таймауты для быстрого UX
+
     private static final int CONNECT_TIMEOUT_MS = 3_000;
     private static final int CHANNEL_TIMEOUT_MS = 3_000;
 
@@ -41,7 +33,6 @@ public class SSHManager {
     private volatile InputStream inputStream;
     private volatile OutputStream outputStream;
 
-    // Отдельные single-thread executors под коннект и чтение
     private final ExecutorService readerExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ssh-reader");
         t.setDaemon(true);
@@ -56,7 +47,7 @@ public class SSHManager {
     private final List<Consumer<String>> dataListeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
 
-    private String knownHostsPath = null;            // если null — используем ~/.ssh/known_hosts
+    private String knownHostsPath = null;
     private int serverAliveIntervalMs = 15_000;
     private int serverAliveCountMax = 3;
 
@@ -64,9 +55,6 @@ public class SSHManager {
         this.config = Objects.requireNonNull(config, "config");
     }
 
-    /* ===================== ПУБЛИЧНЫЙ API ===================== */
-
-    /** Асинхронное подключение (не блокирует UI-поток). */
     public CompletableFuture<Void> connectAsync() {
         return CompletableFuture.runAsync(() -> {
             try {
@@ -79,7 +67,6 @@ public class SSHManager {
         }, connectExecutor);
     }
 
-    /** Потокобезопасно отправляет данные в SSH-канал. */
     public void send(String data) throws IOException {
         if (!isConnected.get()) {
             throw new IllegalStateException("SSH-Verbindung ist nicht hergestellt.");
@@ -93,14 +80,10 @@ public class SSHManager {
         logger.debug("Gesendet: {}", data);
     }
 
-    /**
-     * Подписка на входящие данные. Возвращает AutoCloseable для удобной отписки.
-     */
     public void addDataListener(Consumer<String> listener) {
         dataListeners.add(listener);
     }
 
-    /** Корректно разрывает соединение и останавливает фоновые потоки. */
     public void disconnect() {
         closeQuietly(inputStream);
         closeQuietly(outputStream);
@@ -113,21 +96,15 @@ public class SSHManager {
 
     public boolean isConnected() { return isConnected.get(); }
 
-    /* ===================== НАСТРОЙКИ (флюент) ===================== */
-
-    /** Keep-alive параметры. */
     public SSHManager withKeepAlive(int intervalMs, int countMax) {
         this.serverAliveIntervalMs = Math.max(0, intervalMs);
         this.serverAliveCountMax = Math.max(1, countMax);
         return this;
     }
 
-    /* ===================== ВНУТРЕННЯЯ ЛОГИКА ===================== */
-
     private void connect() throws JSchException, IOException {
         JSch jsch = new JSch();
 
-        // 1) known_hosts
         String khPath = resolveKnownHostsPath();
         boolean khExists = khPath != null && new File(khPath).exists();
         if (khExists) {
@@ -139,24 +116,14 @@ public class SSHManager {
             }
         }
 
-        // 2) Идентификация пользователем (ключ)
         jsch.addIdentity(config.privateKeyPath());
 
-        // 3) Хост/адрес назначения
         String sessionHost;
-        // опциональный форс IPv4 (ускоряет при проблемах с IPv6)
         boolean forceIPv4 = false;
         sessionHost = config.host();
-
-        // 4) Создаём и настраиваем сессию
         session = jsch.getSession(config.user(), sessionHost, config.port());
-
-        // Чтобы ключ в known_hosts сопоставлялся с именем сервера, а не IP (актуально при forceIPv4)
-
-        // Ускоряем — используем только publickey
         session.setConfig("PreferredAuthentications", "publickey");
 
-        // Keep-alive
         try {
             session.setServerAliveInterval(serverAliveIntervalMs);
             session.setServerAliveCountMax(serverAliveCountMax);
@@ -164,22 +131,16 @@ public class SSHManager {
             logger.warn("Keep-alive konnte nicht gesetzt werden: {}", e.getMessage());
         }
 
-        // 5) Решаем StrictHostKeyChecking для ЭТОГО подключения
         String strictThisTime;
         if (khExists) {
             HostKeyRepository repo = jsch.getHostKeyRepository();
             HostKey[] existing = safeGetHostKeys(repo, config.host());
             if (existing != null && existing.length > 0) {
-                // Запись для хоста уже есть → уважаем глобальную настройку
-                // Настройки безопасности/сети
-                // после "обучения" оставляем строгую проверку
                 strictThisTime = "yes";
             } else {
-                // Для этого хоста записи нет → примем ключ и потом сохраним
                 strictThisTime = "no";
             }
         } else {
-            // Файла known_hosts нет → примем и создадим
             strictThisTime = "no";
         }
         session.setConfig("StrictHostKeyChecking", strictThisTime);
@@ -187,12 +148,10 @@ public class SSHManager {
         logger.info("Verbinde zu {}:{} als {} (StrictHostKeyChecking={}, forceIPv4={})",
                 config.host(), config.port(), config.user(), strictThisTime, forceIPv4);
 
-        // 6) Подключаемся
         long t0 = System.currentTimeMillis();
         session.connect(CONNECT_TIMEOUT_MS);
         logger.debug("session.connect in {} ms", (System.currentTimeMillis() - t0));
 
-        // 7) Если принимали хост-ключ впервые — сохраним его
         if ("no".equalsIgnoreCase(strictThisTime)) {
             try {
                 if (khPath == null) {
@@ -219,7 +178,6 @@ public class SSHManager {
             }
         }
 
-        // 8) Открываем shell-канал
         channel = (ChannelShell) session.openChannel("shell");
         inputStream = channel.getInputStream();
         outputStream = channel.getOutputStream();

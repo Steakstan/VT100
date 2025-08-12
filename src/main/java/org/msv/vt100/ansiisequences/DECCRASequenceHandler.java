@@ -24,7 +24,7 @@ public class DECCRASequenceHandler {
         String[] params = paramsPart.split(";");
 
         if (params.length < 8) {
-            logger.warn("Not enough parameters for DECCRA: {}", sequence);
+            logger.warn("Nicht genügend Parameter für DECCRA: {}", sequence);
             return;
         }
 
@@ -57,8 +57,8 @@ public class DECCRASequenceHandler {
             // If source and destination are on the same page and the destination top is only one row below source,
             // adjust the destination to avoid shifting the entire text.
             if (Psrc_page == Pdst_page && Ptd == Pts + 1) {
-                logger.info("Overlapping source and destination on the same page with vertical offset detected; " +
-                        "adjusting destination top row from {} to {} to avoid shifting the text.", Ptd, Pts);
+                logger.info("Überlappende Quelle und Ziel auf derselben Seite mit vertikalem Versatz erkannt; " +
+                        "Zieloberzeile von {} auf {} angepasst, um Verschiebung des Textes zu vermeiden.", Ptd, Pts);
                 Ptd = Pts;
             }
 
@@ -74,7 +74,7 @@ public class DECCRASequenceHandler {
             }
 
         } catch (NumberFormatException e) {
-            logger.error("Error parsing DECCRA parameters: {}", sequence, e);
+            logger.error("Fehler beim Parsen der DECCRA-Parameter: {}", sequence, e);
         }
     }
 

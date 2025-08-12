@@ -4,12 +4,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Потокобезопасный курсор терминала.
- * - row/column всегда в [0..max-1]
- * - операции атомарны под lock
- * - есть Condition для ожидания изменений (опционально)
- */
+
 public class Cursor {
 
     private volatile int row;
@@ -30,17 +25,14 @@ public class Cursor {
         this.column = 0;
     }
 
-    /* ==================== GET ==================== */
-
     public int getRow() {
-        return row; // volatile — видимость без lock
+        return row;
     }
 
     public int getColumn() {
-        return column; // volatile — видимость без lock
+        return column;
     }
 
-    /* ==================== SET/CHANGE ==================== */
 
     public void setPosition(int newRow, int newColumn) {
         lock.lock();
@@ -63,9 +55,7 @@ public class Cursor {
             if (column < maxColumns - 1) {
                 column++;
             } else if (row < maxRows - 1) {
-                // по желанию можно переносить на новую строку; текущая логика — стоп у края
-                // column = 0; row++;
-                column = maxColumns - 1; // остаёмся на месте (как в исходной логике)
+                column = maxColumns - 1;
             }
             positionChanged.signalAll();
         } finally {
@@ -100,22 +90,12 @@ public class Cursor {
         }
     }
 
-    /* ==================== WAIT/UTIL ==================== */
-
-    /**
-     * Возвращает позицию курсора как "row,col" (1-индексация для UI-совместимости).
-     * Сигнатура оставлена с throws для совместимости; фактически ничего не бросает.
-     */
     public String getCursorPosition() throws InterruptedException {
         int r = this.row;     // volatile read
         int c = this.column;  // volatile read
         return (r + 1) + "," + (c + 1);
     }
 
-    /**
-     * Опционально: подождать изменения позиции до таймаута.
-     * @return true — позиция изменилась; false — таймаут.
-     */
     public boolean awaitPositionChange(long timeoutMillis) throws InterruptedException {
         lock.lock();
         try {

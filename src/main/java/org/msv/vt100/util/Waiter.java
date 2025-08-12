@@ -24,14 +24,12 @@ public class Waiter {
             }
         }, 0, interval.toMillis(), TimeUnit.MILLISECONDS);
 
-        // Таймаут
         scheduler.schedule(() -> {
             if (!future.isDone()) {
                 future.completeExceptionally(new TimeoutException("Bedingung nicht erfüllt innerhalb der Frist."));
             }
         }, timeout.toMillis(), TimeUnit.MILLISECONDS);
 
-        // Остановка задачи после выполнения
         future.whenComplete((result, error) -> pollingTask.cancel(true));
 
         return future;

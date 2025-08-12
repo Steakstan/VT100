@@ -39,7 +39,6 @@ public class TerminalCanvas extends Canvas {
 
     private ContextMenu contextMenu;
 
-    // Единые границы строк: rowEdges[i] = нижняя граница i-й строки в px, длина rows+1
     private double[] rowEdges;
 
     public TerminalCanvas(ScreenBuffer screenBuffer, double width, double height) {
@@ -131,13 +130,11 @@ public class TerminalCanvas extends Canvas {
         }
         rowEdges[0] = 0.0;
         for (int i = 1; i <= rows; i++) {
-            // Единый снап вниз, чтобы все потребители имели одни и те же границы
             rowEdges[i] = Math.floor(i * cellHeight);
         }
     }
 
     private void markRowDirty(int r) {
-        // Расширяем грязь на вертикальных соседей, чтобы убирать межкадровые гонки
         dirty.markRowDirty(r);
         if (r - 1 >= 0) dirty.markRowDirty(r - 1);
         if (r + 1 < screenBuffer.getRows()) dirty.markRowDirty(r + 1);
@@ -157,7 +154,6 @@ public class TerminalCanvas extends Canvas {
         final GraphicsContext gc = getGraphicsContext2D();
         gc.setTextAlign(TextAlignment.CENTER);
 
-        // Дифф-скан по чистым строкам: если содержимое изменилось — метим строку грязной (и, через markRowDirty, соседей)
         for (int r = 0; r < rows; r++) {
             if (dirty.isRowDirty(r)) continue;
             for (int c = 0; c < cols; c++) {
@@ -171,13 +167,11 @@ public class TerminalCanvas extends Canvas {
             }
         }
 
-        // Курсор: инвалидация текущей/предыдущей строки (и их соседей через markRowDirty)
         if (cursorVisible != prevCursorVisible || cursorRow != prevCursorRow || cursorCol != prevCursorCol) {
             markRowDirty(prevCursorRow);
             markRowDirty(cursorRow);
         }
 
-        // Сбор «полос» (bands) из смежных грязных строк с расширением на соседа вверх/вниз
         List<int[]> bands = new ArrayList<>();
         for (int r = 0; r < rows; ) {
             if (!dirty.isRowDirty(r)) { r++; continue; }
@@ -188,7 +182,6 @@ public class TerminalCanvas extends Canvas {
             int ns = Math.max(0, start - 1);
             int ne = Math.min(rows - 1, end + 1);
 
-            // Сливаем с предыдущей полосой при перекрытии/соприкосновении
             if (!bands.isEmpty()) {
                 int[] last = bands.get(bands.size() - 1);
                 if (ns <= last[1] + 1) {
@@ -201,7 +194,6 @@ public class TerminalCanvas extends Canvas {
             }
         }
 
-        // Если нет работы — только курсор мог измениться; он уже покрыт через markRowDirty выше
         if (bands.isEmpty()) {
             prevCursorRow = cursorRow;
             prevCursorCol = cursorCol;
@@ -209,7 +201,6 @@ public class TerminalCanvas extends Canvas {
             return;
         }
 
-        // Рендер по полосам: прозрачная очистка + клип полосы + рисуем все строки в ней
         for (int[] band : bands) {
             int start = band[0];
             int end = band[1];
@@ -218,23 +209,21 @@ public class TerminalCanvas extends Canvas {
             double y1 = Math.min(getHeight(), Math.ceil(rowEdges[end + 1]) + 1);
             double bandH = y1 - y0;
 
-            // Прозрачная очистка ТОЛЬКО области полосы
             gc.clearRect(0, y0, getWidth(), bandH);
 
-            // Клип, чтобы никакая другая очистка не «срезала» оверсцан
             gc.save();
             gc.beginPath();
             gc.rect(0, y0, getWidth(), bandH);
             gc.clip();
 
-            // Рисуем строки внутри полосы
+
             for (int r = start; r <= end; r++) {
                 renderer.renderBackgroundRuns(gc, screenBuffer, r, cellWidth, cellHeight, getWidth(), getHeight());
                 renderer.renderSelectionOverlay(gc, r, cellWidth, cellHeight, screenBuffer.getColumns());
                 renderer.renderTextAndUnderline(gc, screenBuffer, r, cellWidth, cellHeight);
                 renderer.renderBoxChars(gc, screenBuffer, r, cellWidth, cellHeight);
 
-                // Обновляем кэш для всей строки
+
                 for (int c = 0; c < cols; c++) {
                     Cell cell = screenBuffer.getVisibleCell(r, c);
                     lastChars[r][c] = cell.character();
@@ -246,7 +235,6 @@ public class TerminalCanvas extends Canvas {
             gc.restore();
         }
 
-        // Курсор поверх всего
         renderer.drawCursorOverlay(gc, screenBuffer, cursorVisible, cursorRow, cursorCol, cellWidth, cellHeight);
 
         prevCursorRow = cursorRow;

@@ -58,7 +58,7 @@ public class DECOMHandler {
             return; // no-op if unchanged
         }
         this.relativeCursorMode = on;
-        logger.debug("DECOM {}.", on ? "enabled" : "disabled");
+        logger.debug("DECOM {}.", on ? "aktiviert" : "deaktiviert");
         notifyListeners();
     }
 
@@ -67,7 +67,7 @@ public class DECOMHandler {
             try {
                 l.run();
             } catch (Exception e) {
-                logger.debug("DECOM listener threw: {}", e.toString());
+                logger.debug("DECOM-Listener warf: {}", e.toString());
             }
         }
     }

@@ -37,9 +37,6 @@ public class LoginSettingsDialog {
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("Login‑Einstellungen");
 
-        // Создаём header с применением стиля dialog-header, который задаёт:
-        // - Закруглённые верхние углы (15 15 0 0) и прямые нижние
-        // - Внутренний padding и выравнивание по левому краю.
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
         Label titleLabel = new Label("Login‑Einstellungen");
@@ -51,11 +48,10 @@ public class LoginSettingsDialog {
         closeButton.setOnAction(e -> dialog.close());
         header.getChildren().addAll(titleLabel, spacer, closeButton);
 
-        // Создаём панель для ввода данных.
         GridPane inputGrid = new GridPane();
         inputGrid.setHgap(10);
         inputGrid.setVgap(10);
-        inputGrid.setPadding(new Insets(10)); // отступы для полей ввода
+        inputGrid.setPadding(new Insets(10));
         Label profileNameLabel = new Label("Profilname:");
         profileNameLabel.getStyleClass().add("dialog-label-turquoise");
         profileNameField = new TextField();
@@ -89,7 +85,6 @@ public class LoginSettingsDialog {
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
         inputGrid.add(buttonBox, 1, 3);
 
-        // Создаём таблицу для отображения профилей.
         profileTable = new TableView<>();
         profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         profileTable.setPlaceholder(new Label("Keine Profile verfügbar"));
@@ -133,7 +128,6 @@ public class LoginSettingsDialog {
         VBox tableBox = new VBox(profileTable);
         tableBox.setPadding(new Insets(10));
 
-        // Объединяем панель ввода и таблицу в один горизонтальный блок
         HBox contentRow = new HBox(10, inputGrid, tableBox);
         contentRow.setPadding(new Insets(10));
 
@@ -141,13 +135,11 @@ public class LoginSettingsDialog {
         contentPanel.getStyleClass().add("dialog-grid");
         contentPanel.getChildren().add(contentRow);
 
-        // Объединяем header и contentPanel в одном VBox без промежутка, чтобы header "прилипал" к верхней границе.
         VBox root = new VBox();
         root.setSpacing(0);
         root.getChildren().addAll(header, contentPanel);
         root.setBackground(new Background(new BackgroundFill(Color.rgb(0, 43, 54, 0), null, null)));
 
-        // Задаём общий clip для скругления внешних углов окна.
         Rectangle clip = new Rectangle(900, 480);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
@@ -165,7 +157,7 @@ public class LoginSettingsDialog {
 
         dialog.setScene(scene);
         DialogHelper.centerDialogOnOwner(dialog, terminalApp.getUIController().getPrimaryStage());
-        DialogHelper.enableDragging(dialog, header); // header — это HBox из заголовка
+        DialogHelper.enableDragging(dialog, header);
     }
 
     private void updateProfileList() {

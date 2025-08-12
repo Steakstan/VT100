@@ -70,27 +70,20 @@ public class EscapeSequenceHandler {
         );
         this.leftRightMarginSequenceHandler = leftRightMarginSequenceHandler;
         this.insertLineHandler = insertLineHandler;
-
-        // NEW: протягиваем TextFormater во все места, где есть заливки/очистки
         this.erasingSequences.setTextFormater(textFormater);
         this.insertLineHandler.setTextFormater(textFormater);
         this.scrollingRegionHandler.setTextFormater(textFormater);
         this.eraseCharacterHandler.setTextFormater(textFormater);
         this.fillRectangularAreaHandler.setTextFormater(textFormater);
-
-        // FillRectangularAreaHandler уже привязывается к режимам
         this.fillRectangularAreaHandler.setLeftRightMarginModeHandler(leftRightMarginModeHandler);
         this.fillRectangularAreaHandler.setScrollingRegionHandler(scrollingRegionHandler);
     }
-
-    // Method to process a completed escape sequence
     public void processEscapeSequence(String sequence) {
-        // Remove ESC character if present
         if (sequence.startsWith("\u001B")) {
             sequence = sequence.substring(1);
         }
 
-        logger.info("Escape sequence received: {}", sequence);
+        logger.info("Escape-Sequenz empfangen: {}", sequence);
 
         switch (sequence) {
             case "[?6l":
@@ -125,14 +118,14 @@ public class EscapeSequenceHandler {
                 break;
             case "[?7h":
                 cursorController.setWraparoundModeEnabled(false);
-                logger.info("Режим автоматического переноса строк включен.");
+                logger.info("Automatischer Zeilenumbruchmodus aktiviert.");
                 break;
             case "[?7l":
                 cursorController.setWraparoundModeEnabled(true);
-                logger.info("Режим автоматического переноса строк отключен.");
+                logger.info("Automatischer Zeilenumbruchmodus deaktiviert.");
                 break;
             case "[?42h":
-                nrcsHandler.enableNrcsMode(NrcsHandler.NrcsMode.GERMAN); // Задайте нужный набор символов
+                nrcsHandler.enableNrcsMode(NrcsHandler.NrcsMode.GERMAN);
                 break;
             case "[?42l":
                 nrcsHandler.disableNrcsMode();
@@ -150,9 +143,8 @@ public class EscapeSequenceHandler {
                 leftRightMarginModeHandler.disableLeftRightMarginMode();
                 break;
             case "#6":
-                // Обработка последовательности ESC #6 (DECDWL)
                 lineAttributeHandler.setDoubleWidthLine(cursor.getRow(),true);
-                logger.info("Установлена двойная ширина для строки {}", cursor.getRow() + 1);
+                logger.info("Doppelte Breite für Zeile {} gesetzt", cursor.getRow() + 1);
                 break;
             case "#5":
                 break;
@@ -165,23 +157,20 @@ public class EscapeSequenceHandler {
                             ? leftRightMarginModeHandler.getLeftMargin()
                             : 0;
 
-                    cursor.setPosition(top, left); // ← вот тут корректное перемещение курсора
-                    logger.info("Курсор перемещён в верхний левый угол области: row={}, col={}", top + 1, left + 1);
+                    cursor.setPosition(top, left);
+                    logger.info("Cursor in die linke obere Ecke des Bereichs verschoben: Zeile={}, Spalte={}", top + 1, left + 1);
                     return;
                 }
 
                 else if (sequence.matches("\\[\\d+;\\d+H")) {
-                    // Handle cursor movement
                     cursorMovementHandler.handleCursorMovement(sequence);
                 }
                 else if (sequence.matches("\\[([0-9;]*?)\\$x")) {
-                    // Handle DECFRA (Fill Rectangular Area)
                     fillRectangularAreaHandler.handleDECFRA(sequence);
                     return;
                 }
 
                 else if (sequence.matches("\\[(\\d+)M")) {
-                    // Извлекаем число n
                     Matcher matcher = Pattern.compile("\\[(\\d+)M").matcher(sequence);
                     if (matcher.matches()) {
                         int n = Integer.parseInt(matcher.group(1));
@@ -201,12 +190,11 @@ public class EscapeSequenceHandler {
                             ? leftRightMarginModeHandler.getLeftMargin()
                             : 0;
 
-                    cursor.setPosition(top, left);  // <-- Добавь это!
-                    logger.info("Курсор перемещён в верхний левый угол после установки полей: row={}, col={}", top + 1, left + 1);
+                    cursor.setPosition(top, left);
+                    logger.info("Cursor nach Setzen der Ränder in die linke obere Ecke verschoben: Zeile={}, Spalte={}", top + 1, left + 1);
                 }
 
                 else if (sequence.matches("\\[([0-9;]*?)\\$v")) {
-                    // Обработка DECCRA
                     deccraSequenceHandler.handleDECCRA(sequence);
                 }
                 else if (sequence.matches("\\[\\d+X")) {
@@ -218,7 +206,7 @@ public class EscapeSequenceHandler {
 
 
                 else {
-                    logger.warn("Неизвестная или не обрабатываемая escape-последовательность: {}", sequence);                }
+                    logger.warn("Unbekannte oder nicht unterstützte Escape-Sequenz: {}", sequence);              }
                 break;
         }
     }
@@ -226,8 +214,7 @@ public class EscapeSequenceHandler {
     public boolean isEndOfSequence(StringBuilder currentSequence) {
         String currentSeqString = currentSequence.toString();
 
-        // Проверка для последовательностей, где могут быть цифры
-        if (currentSeqString.matches("\\u001B\\[\\d+;\\d+r")) { // Установка области прокрутки
+        if (currentSeqString.matches("\\u001B\\[\\d+;\\d+r")) {
             return true;
         }
         if (currentSeqString.matches("\\u001B\\[([0-9;]*?)\\$x")) {
@@ -239,13 +226,12 @@ public class EscapeSequenceHandler {
         if (currentSeqString.matches("\\u001B\\[\\d+X")) {
             return true;
         }
-        if (currentSeqString.matches("\\u001B\\[\\d+;\\d+H")) { // Перемещение курсора
+        if (currentSeqString.matches("\\u001B\\[\\d+;\\d+H")) {
             return true;
         }
-        if (currentSeqString.matches("\\u001B\\[\\d+K")) { // Очистка от позиции до конца строки
+        if (currentSeqString.matches("\\u001B\\[\\d+K")) {
             return true;
         }
-        // Проверка для последовательностей типа ESC [nM
         if (currentSeqString.matches("\\u001B\\[(\\d+)M")) {
             return true;
         }
@@ -262,8 +248,6 @@ public class EscapeSequenceHandler {
             return true;
         }
 
-
-        // Проверка для остальных конкретных последовательностей
         return switch (currentSeqString) {
             case "\u001B[0J", "\u001B[?6l","\u001B[?6h", "\u001B(K", "\u001B[?25h", "\u001B[?25l","\u001B[?42h", "\u001B[?68l", "\u001B[?7h",
                  "\u001B>", "\u001BP4.zGerman()", "\u001B[2J", "\u001B[2*x", "\u001B(0", "\u001B[7m",

@@ -15,8 +15,7 @@ public class LoginProfilesConfig {
 
     private static final String CONFIG_FILE = System.getProperty("user.home") + File.separator + ".vt100_login_profiles.enc";
     private static final String ALGORITHM = "AES";
-    // В реальном приложении ключ не должен быть захардкожен
-    private static final byte[] KEY_BYTES = "MySecretKey12345".getBytes(StandardCharsets.UTF_8); // 16 байт для AES
+    private static final byte[] KEY_BYTES = "MySecretKey12345".getBytes(StandardCharsets.UTF_8);
     private static final Key SECRET_KEY = new SecretKeySpec(KEY_BYTES, ALGORITHM);
     private static final Gson gson = new Gson();
 
@@ -31,12 +30,10 @@ public class LoginProfilesConfig {
             String json = new String(decrypted, StandardCharsets.UTF_8).trim();
             LoginProfilesConfig config;
             if (json.startsWith("[")) {
-                // Файл содержит массив, оборачиваем его в объект конфигурации
                 List<LoginProfile> profiles = gson.fromJson(json, new TypeToken<List<LoginProfile>>(){}.getType());
                 config = new LoginProfilesConfig();
                 config.profiles = profiles != null ? profiles : new ArrayList<>();
             } else {
-                // Файл содержит объект с полем profiles
                 config = gson.fromJson(json, LoginProfilesConfig.class);
                 if (config == null) {
                     config = new LoginProfilesConfig();

@@ -28,7 +28,7 @@ public class LeftRightMarginModeHandler {
      */
     public void enableLeftRightMarginMode() {
         leftRightMarginModeEnabled = true;
-        logger.debug("DECVLRM enabled.");
+        logger.debug("DECVLRM aktiviert.");
     }
 
     /**
@@ -37,7 +37,7 @@ public class LeftRightMarginModeHandler {
      */
     public void disableLeftRightMarginMode() {
         leftRightMarginModeEnabled = false;
-        logger.debug("DECVLRM disabled.");
+        logger.debug("DECVLRM deaktiviert.");
     }
 
     /**
@@ -56,13 +56,13 @@ public class LeftRightMarginModeHandler {
         int newRight = Math.max(newLeft, right); // ensure non-decreasing before validation
 
         if (newLeft >= newRight) {
-            logger.debug("Ignored margins because left >= right (left={}, right={}).", left, right);
+            logger.debug("Ränder ignoriert, da links >= rechts (links={}, rechts={}).", left, right);
             return;
         }
 
         this.leftMargin = newLeft;
         this.rightMargin = newRight;
-        logger.debug("Margins set to left={}, right={} (0-based, inclusive).", leftMargin, rightMargin);
+        logger.debug("Ränder gesetzt auf links={}, rechts={} (0-basiert, inkl.).", leftMargin, rightMargin);
     }
 
     /**
@@ -72,7 +72,7 @@ public class LeftRightMarginModeHandler {
     public void normalizeAfterResize(int columns) {
         if (columns <= 0) {
             // Nothing sensible to do; keep current values.
-            logger.debug("normalizeAfterResize skipped due to non-positive column count: {}", columns);
+            logger.debug("normalizeAfterResize übersprungen wegen nicht positiver Spaltenanzahl: {}", columns);
             return;
         }
 
@@ -84,11 +84,11 @@ public class LeftRightMarginModeHandler {
             // Reset to full width
             leftMargin = 0;
             rightMargin = max;
-            logger.debug("Margins collapsed after resize; reset to full width 0..{}.", max);
+            logger.debug("Ränder nach Größenänderung zusammengefallen; auf volle Breite 0..{} zurückgesetzt.", max);
         } else {
             leftMargin = newLeft;
             rightMargin = newRight;
-            logger.debug("Margins normalized after resize to {}..{} within 0..{}.", leftMargin, rightMargin, max);
+            logger.debug("Ränder nach Größenänderung auf {}..{} innerhalb 0..{} normalisiert.", leftMargin, rightMargin, max);
         }
     }
 
@@ -100,7 +100,7 @@ public class LeftRightMarginModeHandler {
         if (columns <= 0) return;
         leftMargin = 0;
         rightMargin = columns - 1;
-        logger.debug("Margins reset to full width 0..{}.", rightMargin);
+        logger.debug("Ränder auf volle Breite 0..{} zurückgesetzt.", rightMargin);
     }
 
     public int getLeftMargin() {

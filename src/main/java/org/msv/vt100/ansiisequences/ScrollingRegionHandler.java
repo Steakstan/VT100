@@ -49,7 +49,7 @@ public class ScrollingRegionHandler {
         try {
             Matcher m = CSI_SCROLL_REGION.matcher(sequence);
             if (!m.matches()) {
-                logger.debug("Ignoring non-scroll-region sequence: {}", sequence);
+                logger.debug("Nicht-Scrollbereichs-Sequenz ignoriert: {}", sequence);
                 return;
             }
 
@@ -74,7 +74,7 @@ public class ScrollingRegionHandler {
             if (!isValidScrollingRegion(newStart, newEnd)) {
                 // Fallback to full screen if invalid (shouldn't happen after clamping)
                 resetToFullScreen();
-                logger.debug("Invalid region after clamp; reset to full screen.");
+                logger.debug("Ungültiger Bereich nach Begrenzung; auf Vollbild zurückgesetzt.");
                 return;
             }
 
@@ -84,13 +84,13 @@ public class ScrollingRegionHandler {
             int left = getCurrentLeftMargin();
             int right = getCurrentRightMargin();
 
-            logger.debug("Scrolling region set: rows {}..{} (1-based), columns {}..{} (1-based)",
+            logger.debug("Scrollbereich gesetzt: Zeilen {}..{} (1-basiert), Spalten {}..{} (1-basiert)",
                     windowStartRow + 1, windowEndRow + 1, left + 1, right + 1);
 
         } catch (Exception e) {
             // Be robust: on any parsing failure, reset to full screen
             resetToFullScreen();
-            logger.debug("Failed to parse scrolling region '{}'. Reset to full screen.", sequence, e);
+            logger.debug("Scrollbereich '{}' konnte nicht geparst werden. Auf Vollbild zurückgesetzt.", sequence, e);
         }
     }
 
@@ -119,7 +119,7 @@ public class ScrollingRegionHandler {
             clearLine(row, left, right);
         }
 
-        logger.debug("Scrolled down within region rows {}..{}, cols {}..{}, by {} lines",
+        logger.debug("Innerhalb des Bereichs Zeilen {}..{}, Spalten {}..{} um {} Zeilen nach unten gescrollt",
                 windowStartRow + 1, windowEndRow + 1, left + 1, right + 1, n);
     }
 
@@ -142,7 +142,7 @@ public class ScrollingRegionHandler {
         // Clear bottom line within margins
         clearLine(windowEndRow, left, right);
 
-        logger.debug("Scrolled up within region rows {}..{}, cols {}..{}",
+        logger.debug("Innerhalb des Bereichs Zeilen {}..{}, Spalten {}..{} nach oben gescrollt",
                 windowStartRow + 1, windowEndRow + 1, left + 1, right + 1);
     }
 

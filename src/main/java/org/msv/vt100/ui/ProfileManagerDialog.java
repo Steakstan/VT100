@@ -40,8 +40,8 @@ public class ProfileManagerDialog {
     private TextField portField;
     private TextField keyPathField;
 
-    private SSHConfig editingProfile = null;   // профиль, который редактируем сейчас (old)
-    private SSHConfig selectedProfile = null;  // профиль, выбранный для подключения (возвращается в showAndWait)
+    private SSHConfig editingProfile = null;
+    private SSHConfig selectedProfile = null;
 
     public ProfileManagerDialog(Stage owner, TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
@@ -52,7 +52,6 @@ public class ProfileManagerDialog {
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("SSH-Verbindungsprofile");
 
-        // Header
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -79,13 +78,13 @@ public class ProfileManagerDialog {
 
         autoConnectToggleGroup = new ToggleGroup();
 
-        // Таблица профилей
+
         profileTable = new TableView<>();
         profileTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         profileTable.setPlaceholder(new Label("Keine Profile verfügbar"));
         profileTable.getStyleClass().add("custom-table");
 
-        // Колонка Benutzer (раньше „Name des Profils“, но в модели нет отдельного имени)
+
         TableColumn<SSHConfig, String> userCol = new TableColumn<>("Benutzer");
         userCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().user()));
 
@@ -102,7 +101,7 @@ public class ProfileManagerDialog {
         profileTable.getColumns().addAll(List.<TableColumn<SSHConfig, ?>>of(userCol, hostCol, autoCol, dateCol));
         updateProfileList();
 
-        // Двойной клик — выбрать профиль и закрыть
+
         profileTable.setOnMouseClicked(event -> {
             if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
                 SSHConfig selected = profileTable.getSelectionModel().getSelectedItem();
@@ -113,7 +112,6 @@ public class ProfileManagerDialog {
             }
         });
 
-        // Левая часть (таблица) + правая панель кнопок
         VBox tableBox = new VBox(10);
         tableBox.setPadding(new Insets(10));
         tableBox.getStyleClass().add("dialog-grid");
@@ -148,7 +146,7 @@ public class ProfileManagerDialog {
         editBtn.setOnAction(e -> {
             SSHConfig selected = profileTable.getSelectionModel().getSelectedItem();
             if (selected != null) {
-                editingProfile = selected; // запомним old
+                editingProfile = selected;
                 populateSettingsFields(selected);
                 tabPane.getSelectionModel().select(settingsTab);
             }
@@ -175,13 +173,11 @@ public class ProfileManagerDialog {
 
         profilesTab.setContent(tableBox);
 
-        // Контент вкладки „Profileinstellungen“
         buildSettingsTabContent();
 
         tabPane.getTabs().addAll(profilesTab, settingsTab);
         tabPane.getSelectionModel().select(profilesTab);
 
-        // Корень
         BorderPane root = new BorderPane();
         root.setTop(header);
         root.setCenter(tabPane);
@@ -218,9 +214,7 @@ public class ProfileManagerDialog {
                 radio.setToggleGroup(autoConnectToggleGroup);
                 radio.setOnAction(e -> {
                     SSHConfig item = getTableView().getItems().get(getIndex());
-                    // Гарантируем единственный autoConnect через спец-метод менеджера
                     SSHProfileManager.setAutoConnect(item, true);
-                    // Обновим таблицу, чтобы снять флаг у остальных строк
                     updateProfileList();
                 });
             }
@@ -295,13 +289,13 @@ public class ProfileManagerDialog {
                         hostField.getText().trim(),
                         port,
                         keyPathField.getText().trim(),
-                        false // autoConnect в форме редактирования не трогаем
+                        false
                 );
 
                 if (editingProfile == null) {
                     SSHProfileManager.addProfile(newProfile);
                 } else {
-                    // ВАЖНО: обновляем по схеме old -> updated, чтобы не плодить дубликаты
+
                     SSHProfileManager.updateProfile(editingProfile, newProfile);
                 }
 

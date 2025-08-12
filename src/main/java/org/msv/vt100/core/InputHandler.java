@@ -14,15 +14,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-/**
- * InputHandler:
- * - Обрабатывает KeyPressed/KeyTyped.
- * - Ctrl+C: копирование выделенного или отправка ETX (0x03).
- * - Ctrl+V: вставка (переводит \n/\r\n в \r).
- * - Спецклавиши: стрелки, Delete/Home/End/PageUp/PageDown, F1–F12 (VT/ANSI).
- * - Backspace по KeyPressed (надежно на всех платформах).
- * - F5: копирует позицию курсора и подсвечивает ячейку (нормализованный стиль fill/background).
- */
 public class InputHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(InputHandler.class);
@@ -37,12 +28,9 @@ public class InputHandler {
         this.cursor = cursor;
     }
 
-    /* ========================= KeyPressed ========================= */
-
     public void handleKeyPressed(KeyEvent event) {
         KeyCode code = event.getCode();
 
-        // Ctrl+комбинации
         if (event.isControlDown()) {
             if (code == KeyCode.C) {
                 handleCtrlC();
@@ -56,7 +44,6 @@ public class InputHandler {
             }
         }
 
-        // Спецклавиши → escape sequences
         String esc = getEscapeSequence(code);
         if (esc != null) {
             sendToSSH(esc);
@@ -64,21 +51,19 @@ public class InputHandler {
             return;
         }
 
-        // F5 — сервисная
         if (code == KeyCode.F5) {
             handleF5KeyPress();
             event.consume();
         }
     }
 
-    /* ========================= KeyTyped ========================= */
 
     public void handleKeyTyped(KeyEvent event) {
         String ch = event.getCharacter();
         if (ch.isEmpty() || event.isControlDown() || event.isAltDown() || event.isMetaDown()) {
             return;
         }
-        // Перевод строки → CR
+
         if ("\n".equals(ch)) {
             sendToSSH("\r");
         } else {
@@ -87,7 +72,6 @@ public class InputHandler {
         event.consume();
     }
 
-    /* ========================= Комбинации ========================= */
 
     private void handleCtrlC() {
         String selectedText = terminalApp.getSelectedText();
@@ -97,7 +81,6 @@ public class InputHandler {
             Clipboard.getSystemClipboard().setContent(content);
             logger.info("Text in die Zwischenablage kopiert ({} Zeichen).", selectedText.length());
         } else {
-            // ETX (Interrupt)
             sendToSSH("\u0003");
         }
     }
@@ -109,12 +92,9 @@ public class InputHandler {
         String text = clipboard.getString();
         if (text == null || text.isEmpty()) return;
 
-        // Нормализация переводов строк: \r\n / \n → \r
         text = text.replace("\r\n", "\r").replace("\n", "\r");
         sendToSSH(text);
     }
-
-    /* ========================= Подсветка курсора (F5) ========================= */
 
     private void handleF5KeyPress() {
         int row1 = cursor.getRow() + 1;
@@ -129,10 +109,6 @@ public class InputHandler {
         highlightCursorPosition();
     }
 
-    /**
-     * Подсветка текущей ячейки курсора на 1 секунду. Используем
-     * нормализованные ключи стиля: "fill" и "background".
-     */
     public void highlightCursorPosition() {
         int r = cursor.getRow();
         int c = cursor.getColumn();
@@ -151,28 +127,19 @@ public class InputHandler {
         restore.play();
     }
 
-    /* ========================= Escape sequences ========================= */
-
-    /**
-     * Карта распространённых VT/ANSI escape-последовательностей.
-     * Стрелки/навигация — CSI.
-     * Function keys — совместимые коды (xterm/VT220-стиль).
-     */
     private String getEscapeSequence(KeyCode code) {
         return switch (code) {
-            // Навигация
             case UP       -> "\u001B[A";
             case DOWN     -> "\u001B[B";
             case RIGHT    -> "\u001B[C";
             case LEFT     -> "\u001B[D";
             case INSERT   -> "\u001B[2~";
             case DELETE   -> "\u001B[3~";
-            case HOME     -> "\u001B[H";    // альтернативно: \u001B[1~
-            case END      -> "\u001B[F";    // альтернативно: \u001B[4~
+            case HOME     -> "\u001B[H";
+            case END      -> "\u001B[F";
             case PAGE_UP  -> "\u001B[5~";
             case PAGE_DOWN-> "\u001B[6~";
 
-            // Функциональные клавиши — xterm/VT220 номера
             case F1  -> "\u001BOP";   // SS3 P
             case F2  -> "\u001BOQ";   // SS3 Q
             case F3  -> "\u001BOR";   // SS3 R
@@ -190,7 +157,6 @@ public class InputHandler {
         };
     }
 
-    /* ========================= SSH ========================= */
 
     private void sendToSSH(String data) {
         SSHManager manager = terminalApp.getSSHManager();
@@ -200,7 +166,6 @@ public class InputHandler {
         }
         try {
             manager.send(data);
-            // Не логируем полный ввод, чтобы не засветить пароли
             logger.debug("An SSH gesendet ({} Zeichen).", data.length());
         } catch (IOException e) {
             logger.error("Fehler beim Senden an SSH: {}", e.getMessage(), e);

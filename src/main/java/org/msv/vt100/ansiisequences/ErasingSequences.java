@@ -27,8 +27,6 @@ public class ErasingSequences {
     private final Cursor cursor;
     private final ScrollingRegionHandler scrollingRegionHandler;
     private final LeftRightMarginModeHandler leftRightMarginModeHandler;
-
-    // NEW: используем текущие SGR-атрибуты для стирания
     private TextFormater textFormater;
 
     public ErasingSequences(ScreenBuffer screenBuffer,
@@ -63,7 +61,7 @@ public class ErasingSequences {
                 clearLineWithinMargins(r);
             }
 
-            logger.debug("ED(0): cleared from cursor to end of screen starting at row {}, col {} (1-based).",
+            logger.debug("ED(0): von Cursor bis Bildschirmende gelöscht ab Zeile {}, Spalte {} (1-basiert).",
                     row + 1, col + 1);
         });
     }
@@ -82,7 +80,7 @@ public class ErasingSequences {
             // 2) Clear from left margin to cursor in current row
             clearRangeInLine(row, getLeftMargin(), col);
 
-            logger.debug("ED(1): cleared from start of screen to cursor ending at row {}, col {} (1-based).",
+            logger.debug("ED(1): vom Bildschirmanfang bis zum Cursor gelöscht, endet bei Zeile {}, Spalte {} (1-basiert).",
                     row + 1, col + 1);
         });
     }
@@ -95,7 +93,7 @@ public class ErasingSequences {
             for (int r = 0; r < rows; r++) {
                 clearRangeInLineFullWidth(r, 0, cols - 1);
             }
-            logger.debug("ED(2): cleared entire screen (full width, all rows).");
+            logger.debug("ED(2): gesamten Bildschirm gelöscht (volle Breite, alle Zeilen).");
         });
     }
 
@@ -104,7 +102,7 @@ public class ErasingSequences {
         performWithCursorRestore(() -> {
             int row = cursor.getRow();
             clearLineWithinMargins(row);
-            logger.debug("EL(2): cleared entire line at row {} (1-based).", row + 1);
+            logger.debug("EL(2): ganze Zeile {} gelöscht (1-basiert).", row + 1);
         });
     }
 
@@ -115,7 +113,7 @@ public class ErasingSequences {
             int start = Math.max(cursor.getColumn(), getLeftMargin());
             int end = getRightMargin();
             clearRangeInLine(row, start, end);
-            logger.debug("EL(0): cleared row {} from col {} to {} (1-based).", row + 1, start + 1, end + 1);
+            logger.debug("EL(0): Zeile {} von Spalte {} bis {} gelöscht (1-basiert).", row + 1, start + 1, end + 1);
         });
     }
 
@@ -126,7 +124,7 @@ public class ErasingSequences {
             int start = getLeftMargin();
             int end = Math.min(cursor.getColumn(), getRightMargin());
             clearRangeInLine(row, start, end);
-            logger.debug("EL(1): cleared row {} from col {} to {} (1-based).", row + 1, start + 1, end + 1);
+            logger.debug("EL(1): Zeile {} von Spalte {} bis {} gelöscht (1-basiert).", row + 1, start + 1, end + 1);
         });
     }
 
@@ -143,7 +141,7 @@ public class ErasingSequences {
 
         // Must be inside scrolling region
         if (currentRow < top || currentRow > bottom) {
-            logger.debug("DL ignored: cursor row {} outside scrolling region {}..{} (1-based).",
+            logger.debug("DL ignoriert: Cursorzeile {} außerhalb des Scrollbereichs {}..{} (1-basiert).",
                     currentRow + 1, top + 1, bottom + 1);
             return;
         }
@@ -168,7 +166,7 @@ public class ErasingSequences {
             clearRangeInLine(row, left, right);
         }
 
-        logger.debug("DL: deleted {} line(s) at row {} within region {}..{}, cols {}..{} (1-based).",
+        logger.debug("DL: {} Zeile(n) bei Zeile {} innerhalb Bereich {}..{}, Spalten {}..{} gelöscht (1-basiert).",
                 n, currentRow + 1, top + 1, bottom + 1, left + 1, right + 1);
     }
 

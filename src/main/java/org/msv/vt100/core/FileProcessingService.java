@@ -38,7 +38,7 @@ public FileProcessingService(SSHManager sshManager,
 }
 
 public void processFile(int choice, String excelFilePath) throws InterruptedException {
-    logger.info("Opening Excel file: {}", excelFilePath);
+    logger.info("Excel-Datei wird geöffnet: {}", excelFilePath);;
     isPaused.set(false);
     isStopped.set(false);
 
@@ -92,25 +92,22 @@ private void showError(String msg) {
     });
 }
 
-    // FileProcessingService.java
     public void shutdown() {
         try {
-            // Сигналим общей логике остановку (флаг общий с TerminalApp)
             isStopped.set(true);
-            isPaused.set(false); // на всякий случай снимаем паузу
+            isPaused.set(false);
         } catch (Throwable ignore) {}
 
-        // Опционально: закрыть любые UI-хвосты
         try {
             Platform.runLater(() -> {
                 try {
                     terminalApp.hideProcessingButtons();
                 } catch (Throwable ignore2) {
-                    // ничего
+
                 }
             });
         } catch (Throwable ignore) {
-            // ничего
+
         }
     }
 

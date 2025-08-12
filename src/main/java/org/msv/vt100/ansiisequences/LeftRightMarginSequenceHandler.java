@@ -47,13 +47,13 @@ public class LeftRightMarginSequenceHandler {
     public void handleLeftRightMarginSequence(String sequence) {
         // Require DECVLRM enabled
         if (!leftRightMarginModeHandler.isLeftRightMarginModeEnabled()) {
-            logger.debug("DECSLRM ignored because DECVLRM is disabled: {}", sequence);
+            logger.debug("DECSLRM ignoriert, da DECVLRM deaktiviert ist: {}", sequence);
             return;
         }
 
         Matcher m = CSI_LR_MARGINS.matcher(sequence);
         if (!m.matches()) {
-            logger.debug("Not a DECSLRM sequence, ignored: {}", sequence);
+            logger.debug("Keine DECSLRM-Sequenz, ignoriert: {}", sequence);
             return;
         }
 
@@ -68,7 +68,7 @@ public class LeftRightMarginSequenceHandler {
 
         // Left must be strictly less than right; zero-width regions are invalid
         if (Pl >= Pr) {
-            logger.debug("DECSLRM invalid margins (Pl >= Pr): Pl={}, Pr={}, cols={}", Pl, Pr, cols);
+            logger.debug("Ungültige DECSLRM-Ränder (Pl >= Pr): Pl={}, Pr={}, Spalten={}", Pl, Pr, cols);
             return;
         }
 
@@ -84,7 +84,7 @@ public class LeftRightMarginSequenceHandler {
         leftRightMarginModeHandler.setLeftRightMargins(newLeft, newRight);
         cursorController.setLeftRightMargins(newLeft, newRight);
 
-        logger.debug("DECSLRM applied: columns {}..{} (1-based).", Pl, Pr);
+        logger.debug("DECSLRM angewendet: Spalten {}..{} (1-basiert).", Pl, Pr);
     }
 
     public int getLeftMargin() {

@@ -35,7 +35,7 @@ public class TerminalApp extends Application {
     private static final int COLUMNS = 80;
     private static final int ROWS = 25;
 
-    // --- Terminal core
+
     private Cursor cursor;
     private CursorVisibilityManager cursorVisibilityManager;
     private ScreenBuffer screenBuffer;
@@ -43,14 +43,11 @@ public class TerminalApp extends Application {
     private ScreenTextDetector screenTextDetector;
     private InputProcessor inputProcessor;
 
-    // --- UI
     private UIController uiController;
 
-    // --- SSH
     private SSHConfig currentProfile;
     private SSHManager sshManager;
 
-    // --- Processing
     private final AtomicBoolean isPaused = new AtomicBoolean(false);
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
     private final Object pauseCondition = new Object();
@@ -61,15 +58,12 @@ public class TerminalApp extends Application {
     };
     private volatile Thread processingThread = null;
 
-    // --- UI state
     private String commentText = "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
     private boolean shouldWriteComment = true;
 
-    // --- Logging
     private boolean isLoggingEnabled = false;
 
-    // --- Render loop control
-    private volatile boolean repaintRequested = true; // первый кадр обязателен
+    private volatile boolean repaintRequested = true;
     private boolean lastCursorVisible = false;
     private Timeline screenUpdateTimeline;
 
@@ -84,16 +78,15 @@ public class TerminalApp extends Application {
 
             cursorVisibilityManager.showCursor();
 
-            // ✅ Корректное завершение при закрытии окна:
+
             primaryStage.setOnCloseRequest(event -> {
                 try {
-                    shutdownApp(); // централизованный shutdown (идемпотентный)
+                    shutdownApp();
                 } catch (Throwable t) {
                     logger.warn("Fehler beim Shutdown: {}", t.getMessage(), t);
                 } finally {
-                    // Корректно закрываем JavaFX
+
                     Platform.exit();
-                    // Как страховка от «упрямых» недеамоновых потоков сторонних либ:
                     System.exit(0);
                 }
             });
@@ -109,7 +102,6 @@ public class TerminalApp extends Application {
         }
     }
 
-    /* ===================== ИНИЦИАЛИЗАЦИЯ ===================== */
 
     private void initializeComponents() {
         cursor = new Cursor(ROWS, COLUMNS);
@@ -172,7 +164,6 @@ public class TerminalApp extends Application {
     }
 
     public void handleBackspace() {
-        // Удаляем символ слева от курсора (как в исходной логике)
         if (cursor.getColumn() > 0) {
             cursor.moveLeft();
             screenBuffer.setCell(cursor.getRow(), cursor.getColumn(), new Cell(" ", textFormater.getCurrentStyle()));
@@ -205,8 +196,6 @@ public class TerminalApp extends Application {
     }
 
 
-    /* ===================== SSH ===================== */
-
     private void connectWithConfig(SSHConfig config) {
         if (sshManager != null && sshManager.isConnected()) {
             try {
@@ -220,7 +209,6 @@ public class TerminalApp extends Application {
         sshManager = new SSHManager(config)
                 .withKeepAlive(15_000, 3);
 
-        // Входящие данные — в FX-поток, далее парсим и просим перерисовку
         sshManager.addDataListener(data ->
                 Platform.runLater(() -> {
                     processInput(data.toCharArray());
@@ -257,12 +245,9 @@ public class TerminalApp extends Application {
     public void disconnectConnection() {
         if (sshManager != null && sshManager.isConnected()) {
             sshManager.disconnect();
-            // Сообщим пользователю в терминале:
             processInput("Die Verbindung wurde abgebrochen\r".toCharArray());
         }
     }
-
-    /* ===================== ОБРАБОТКА ЭКРАНА ===================== */
 
     public void processInput(char[] inputChars) {
         inputProcessor.processInput(inputChars);
@@ -273,9 +258,7 @@ public class TerminalApp extends Application {
         repaintRequested = true;
     }
 
-    // TerminalApp.java
     private void startScreenUpdater() {
-        // 30 FPS достаточно; рисуем только если есть изменения или сменилось состояние курсора
         screenUpdateTimeline = new Timeline(
                 new KeyFrame(Duration.millis(33), event -> updateScreenIfNeeded())
         );
@@ -283,28 +266,24 @@ public class TerminalApp extends Application {
         screenUpdateTimeline.play();
     }
 
-
-    /** ✅ Стандартная точка жизненного цикла JavaFX — тоже глушим всё здесь. */
     @Override
     public void stop() {
         shutdownApp();
     }
 
     private void shutdownApp() {
-        // 1) Остановить любые пользовательские процессы/потоки обработки
+
         try { stopProcessing(); } catch (Exception ignore) {}
 
-        // Если FileProcessingService имеет собственные экзекьюторы — погасим их
         try {
             if (fileProcessingService != null) {
-                // Метод добавим в FileProcessingService (см. ниже)
+
                 fileProcessingService.shutdown();
             }
         } catch (Exception e) {
-            logger.debug("FileProcessingService shutdown issue: {}", e.getMessage());
+            logger.debug("Problem beim Herunterfahren des FileProcessingService: {}", e.getMessage());
         }
 
-        // 2) Остановить рендер-луп
         try {
             if (screenUpdateTimeline != null) {
                 screenUpdateTimeline.stop();
@@ -312,17 +291,14 @@ public class TerminalApp extends Application {
             }
         } catch (Exception ignore) {}
 
-        // 3) Остановить мигание курсора / таймеры курсора
         try {
             if (cursorVisibilityManager != null) {
-                // Метод добавим в CursorVisibilityManager (см. ниже)
                 cursorVisibilityManager.shutdown();
             }
         } catch (Exception e) {
-            logger.debug("CursorVisibilityManager shutdown issue: {}", e.getMessage());
+            logger.debug("Problem beim Herunterfahren des CursorVisibilityManager: {}", e.getMessage());
         }
 
-        // 4) Разорвать SSH (он сам глушит свои executors)
         try {
             if (sshManager != null && sshManager.isConnected()) {
                 sshManager.disconnect();
@@ -337,7 +313,7 @@ public class TerminalApp extends Application {
             lastCursorVisible = currentCursorVisible;
         }
         if (!repaintRequested) {
-            return; // тишина — ничего не рисуем
+            return;
         }
         updateScreen();
         repaintRequested = false;
@@ -351,7 +327,6 @@ public class TerminalApp extends Application {
         canvas.updateScreen();
     }
 
-    /* ===================== КНОПКИ / ДИАЛОГИ ===================== */
 
     public void showProcessingButtons() {
         uiController.getContentPanel().showProcessingButtons();
@@ -380,7 +355,6 @@ public class TerminalApp extends Application {
         new LoginSettingsDialog(this).show();
     }
 
-    /* ===================== PROCESSING: PAUSE/RESUME/STOP ===================== */
 
     public void pauseProcessing() {
         isPaused.set(true);
@@ -429,7 +403,6 @@ public class TerminalApp extends Application {
         return isStopped.get();
     }
 
-    /* ===================== ЛОГИРОВАНИЕ ===================== */
 
     public void enableLogging() {
         isLoggingEnabled = true;
@@ -464,7 +437,6 @@ public class TerminalApp extends Application {
         File finalLogFile = new File(logPath);
         File parentDir = finalLogFile.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
-            //noinspection ResultOfMethodCallIgnored
             parentDir.mkdirs();
         }
 
@@ -504,7 +476,6 @@ public class TerminalApp extends Application {
     }
 
 
-    /* ===================== ПУБЛИЧНЫЙ API ===================== */
 
     public SSHManager getSSHManager() {
         return sshManager;

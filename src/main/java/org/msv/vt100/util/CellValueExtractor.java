@@ -13,14 +13,14 @@ public class CellValueExtractor {
         StringBuilder sb = new StringBuilder();
         for (int col : columnIndices) {
             try {
-                Cell cell = screenBuffer.getVisibleCell(rowIndex, col); // ✅ видимая ячейка
+                Cell cell = screenBuffer.getVisibleCell(rowIndex, col);
                 sb.append(cell.character());
             } catch (IndexOutOfBoundsException e) {
-                logger.error("Неверная позиция ячейки: строка {}, столбец {}", row, col);
+                logger.error("Ungültige Zellposition: Zeile {}, Spalte {}", row, col);
             }
         }
         String result = sb.toString();
-        logger.info("Извлечено значение ячеек (строка {}, столбцы {}) : {}", row, columnIndices, result);
+        logger.info("Zellwerte extrahiert (Zeile {}, Spalten {}) : {}", row, columnIndices, result);
         return result;
     }
 }

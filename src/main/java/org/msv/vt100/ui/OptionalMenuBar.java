@@ -147,7 +147,6 @@ public class OptionalMenuBar extends HBox {
             b.setPrefWidth(maxWidth);
         }
 
-        // 👇 Анимация появления popup
         content.setOpacity(0);
         FadeTransition ft = new FadeTransition(Duration.millis(120), content);
         ft.setToValue(1.0);

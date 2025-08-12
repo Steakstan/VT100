@@ -4,16 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * ScreenBuffer:
- * - Двойная буферизация по страницам (committed/backbuffer).
- * - Коммит копирует ТОЛЬКО грязные строки (перфоманс).
- * - Стиль по умолчанию нормализован: "fill: white; background: transparent;".
- * - API совместим с предыдущей версией.
- */
+
 public class ScreenBuffer {
 
-    /** Хранилище страниц: номер → страница */
+
     private final Map<Integer, Page> pages = new HashMap<>();
 
     private int currentPageNumber;
@@ -31,7 +25,6 @@ public class ScreenBuffer {
         pages.put(currentPageNumber, createEmptyPage());
     }
 
-    /* =========================== Публичный API =========================== */
 
     public void switchToPage(int pageNumber) {
         if (pageNumber <= 0) throw new IllegalArgumentException("pageNumber must be > 0");
@@ -43,19 +36,16 @@ public class ScreenBuffer {
         return currentPageNumber;
     }
 
-    /** Возвращает ячейку из backbuffer (рабочий слой). */
     public Cell getCell(int row, int col) {
         ensureValid(row, col);
         return page().backbuffer[row][col];
     }
 
-    /** Возвращает видимую ячейку из committed (экран). */
     public Cell getVisibleCell(int row, int col) {
         ensureValid(row, col);
         return page().committed[row][col];
     }
 
-    /** Устанавливает ячейку в backbuffer и помечает строку грязной при изменении. */
     public void setCell(int row, int col, Cell cell) {
         ensureValid(row, col);
         Objects.requireNonNull(cell, "cell");
@@ -67,10 +57,6 @@ public class ScreenBuffer {
         }
     }
 
-    /**
-     * Переносит изменения из backbuffer → committed.
-     * Копируются только строки, помеченные как грязные.
-     */
     public void commit() {
         Page p = page();
         for (int r = 0; r < rows; r++) {
@@ -81,10 +67,6 @@ public class ScreenBuffer {
         }
     }
 
-    /**
-     * Очищает backbuffer текущей страницы (заполняет пробелами и прозрачным фоном).
-     * Помечает все строки как грязные (чтобы commit обновил экран).
-     */
     public void clearBackbuffer() {
         Page p = page();
         for (int r = 0; r < rows; r++) {
@@ -96,7 +78,6 @@ public class ScreenBuffer {
         }
     }
 
-    /** Текстовое представление committed-экрана. */
     public String toStringVisible() {
         StringBuilder sb = new StringBuilder(rows * (columns + 1));
         Cell[][] v = page().committed;
@@ -109,7 +90,6 @@ public class ScreenBuffer {
         return sb.toString();
     }
 
-    /** Текстовое представление backbuffer. */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(rows * (columns + 1));
@@ -131,8 +111,6 @@ public class ScreenBuffer {
         return columns;
     }
 
-    /* =========================== Внутренняя модель =========================== */
-
     private static final String DEFAULT_STYLE = "fill: white; background: transparent;";
     private static final Cell DEFAULT_CELL = new Cell(" ", DEFAULT_STYLE);
 
@@ -147,11 +125,10 @@ public class ScreenBuffer {
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < columns; c++) {
-                // Один и тот же DEFAULT_CELL (record immutable) безопасно шарится по сетке
                 committed[r][c] = DEFAULT_CELL;
                 backbuffer[r][c] = DEFAULT_CELL;
             }
-            dirtyRows[r] = true; // первая отрисовка — вся страница грязная
+            dirtyRows[r] = true;
         }
         return new Page(committed, backbuffer, dirtyRows);
     }

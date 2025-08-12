@@ -221,7 +221,6 @@ public class PositionssucheProcessor {
                                 writeNormalRow(newRow, buffer, line, defaultCellStyle, firm, order, position);
                             }
                         } else {
-                            // обновление существующей строки
                             if (line == 22) {
                                 updateRow22(existingRow, buffer, defaultCellStyle);
                             } else {
@@ -232,17 +231,16 @@ public class PositionssucheProcessor {
                     }
                 }
 
-                if (pageTransitioned) break; // выйти из for, чтобы заново начать с новой страницы
+                if (pageTransitioned) break;
             }
 
             if (!pageTransitioned) {
-                // Если не перешли страницу — проверяем курсор и переходим вручную, если возможно
                 String currentCursor = getCursorPosition();
                 if (currentCursor.equals("23,10")) {
-                    sendDataWithDelay("\u001BOQ"); // Taste F2 — nächste Seite
+                    sendDataWithDelay("\u001BOQ");
                     Thread.sleep(70);
                 } else {
-                    pageHasMore = false; // больше страниц нет — выходим
+                    pageHasMore = false;
                 }
             }
         }
@@ -373,7 +371,7 @@ public class PositionssucheProcessor {
 
             String current = screenBuffer.toStringVisible();
             if (current.equals(last)) {
-                return; // экран стабилен
+                return;
             }
             last = current;
         }

@@ -12,13 +12,9 @@ public class ContentPanel extends BorderPane {
     private final HBox processingButtons;
     private final TerminalApp terminalApp;
 
-    // Кнопки создаём один раз и переиспользуем
     private final Button pauseButton;
     private final Button stopButton;
-
-    // Локальное знание о состоянии паузы (т.к. публичного геттера нет)
     private volatile boolean paused = false;
-    // Видимость панели (защита от повторной вставки)
     private volatile boolean visible = false;
 
     public ContentPanel(TerminalApp terminalApp) {
@@ -40,7 +36,7 @@ public class ContentPanel extends BorderPane {
     }
 
     private void togglePause() {
-        if (!visible) return; // нет активной обработки
+        if (!visible) return;
         if (!paused) {
             terminalApp.pauseProcessing();
             paused = true;
@@ -54,18 +50,15 @@ public class ContentPanel extends BorderPane {
 
     private void stopProcessing() {
         if (!visible) return;
-        // ВАЖНО: не вызываем здесь interrupt() вручную — TerminalApp.stopProcessing() уже делает это корректно
         terminalApp.stopProcessing();
         hideProcessingButtons();
     }
 
-    /** Показать панель кнопок, если есть активная задача. Идempotентно. */
     public void showProcessingButtons() {
         Platform.runLater(() -> {
             if (visible) return;
             paused = false;
             pauseButton.setText("Pause");
-            // кнопки активируем; если нужно — можно дополнительно проверять наличие worker-потока
             pauseButton.setDisable(false);
             stopButton.setDisable(false);
 
@@ -74,13 +67,12 @@ public class ContentPanel extends BorderPane {
         });
     }
 
-    /** Скрыть панель кнопок. Идempotентно. */
     public void hideProcessingButtons() {
         Platform.runLater(() -> {
             if (!visible) return;
             setBottom(null);
             visible = false;
-            // Сброс локального состояния
+
             paused = false;
             pauseButton.setText("Pause");
         });

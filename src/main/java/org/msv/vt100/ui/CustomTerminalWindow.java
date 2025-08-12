@@ -37,7 +37,6 @@ public class CustomTerminalWindow {
     private static final int TOP_BAR_HEIGHT = 30;
     private static final int BOTTOM_BAR_HEIGHT = 30;
 
-    // Максимизация до VisualBounds (без панели задач)
     private boolean maximizedToWorkArea = false;
     private double restoreX, restoreY, restoreW, restoreH;
 
@@ -74,7 +73,6 @@ public class CustomTerminalWindow {
         scene = new Scene(root, sceneWidth, sceneHeight);
         scene.setFill(Color.TRANSPARENT);
 
-        // CSS
         scene.getStylesheets().addAll(
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/buttons.css")).toExternalForm(),
@@ -82,7 +80,6 @@ public class CustomTerminalWindow {
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/tabs.css")).toExternalForm()
         );
 
-        // Фокус возвращаем на канвас, если уходит на нерелевантные узлы
         scene.focusOwnerProperty().addListener((obs, oldVal, newVal) -> {
             if (!(newVal instanceof TerminalCanvas ||
                     newVal instanceof TextInputControl ||
@@ -127,7 +124,6 @@ public class CustomTerminalWindow {
 
         Button maximizeButton = new Button("☐");
         maximizeButton.getStyleClass().add("top-bar-button");
-        // Переключаем «максимизацию до рабочей области»
         maximizeButton.setOnAction(event -> toggleWorkAreaMaximize());
 
         Button closeButton = new Button("X");
@@ -137,7 +133,6 @@ public class CustomTerminalWindow {
             stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
         });
 
-        // Двойной клик по верхней панели — тоже toggle
         topBar.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) toggleWorkAreaMaximize();
         });
@@ -158,7 +153,7 @@ public class CustomTerminalWindow {
 
     private void enableWindowDragging() {
         root.setOnMousePressed(event -> {
-            if (maximizedToWorkArea) return; // Блокируем перетаскивание, когда «максимизировано»
+            if (maximizedToWorkArea) return;
             if (resizeDir == ResizeDirection.NONE) {
                 xOffset = primaryStage.getX() - event.getScreenX();
                 yOffset = primaryStage.getY() - event.getScreenY();
@@ -252,13 +247,10 @@ public class CustomTerminalWindow {
 
     private void toggleWorkAreaMaximize() {
         if (!maximizedToWorkArea) {
-            // Запоминаем текущее положение/размер
             restoreX = primaryStage.getX();
             restoreY = primaryStage.getY();
             restoreW = primaryStage.getWidth();
             restoreH = primaryStage.getHeight();
-
-            // Выставляем в визуальные границы активного экрана (учитывает панель задач)
             Screen screen = getCurrentScreen();
             Rectangle2D vb = screen.getVisualBounds();
             primaryStage.setX(vb.getMinX());
@@ -268,7 +260,6 @@ public class CustomTerminalWindow {
 
             maximizedToWorkArea = true;
         } else {
-            // Восстанавливаем
             primaryStage.setX(restoreX);
             primaryStage.setY(restoreY);
             primaryStage.setWidth(restoreW);

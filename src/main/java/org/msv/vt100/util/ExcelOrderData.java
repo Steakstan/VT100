@@ -178,7 +178,7 @@ public record ExcelOrderData(String orderNumber, String positionNumber, String d
                 }
             }
             if (dateCol - posCol == 2) {
-                return posCol + 1; // единственная колонка между позицией и датой
+                return posCol + 1;
             }
         }
         return -1;

@@ -18,8 +18,8 @@ final class DirtyTracker {
 
     void markRowDirty(int r) {
         if (r >= 0 && r < dirtyRows.length) dirtyRows[r] = true;
-        if (r - 1 >= 0) dirtyRows[r - 1] = true;           // ← сосед сверху
-        if (r + 1 < dirtyRows.length) dirtyRows[r + 1] = true; // ← сосед снизу
+        if (r - 1 >= 0) dirtyRows[r - 1] = true;
+        if (r + 1 < dirtyRows.length) dirtyRows[r + 1] = true;
     }
 
     void markSelectionRangeDirty(Integer startRow, Integer endRow) {
@@ -27,8 +27,8 @@ final class DirtyTracker {
         int from = Math.max(0, Math.min(startRow, endRow));
         int to   = Math.min(dirtyRows.length - 1, Math.max(startRow, endRow));
         for (int r = from; r <= to; r++) dirtyRows[r] = true;
-        if (from - 1 >= 0) dirtyRows[from - 1] = true;     // ← рамка сверху
-        if (to + 1 < dirtyRows.length) dirtyRows[to + 1] = true; // ← рамка снизу
+        if (from - 1 >= 0) dirtyRows[from - 1] = true;
+        if (to + 1 < dirtyRows.length) dirtyRows[to + 1] = true;
     }
 
     boolean isRowDirty(int r) { return r >= 0 && r < dirtyRows.length && dirtyRows[r]; }

@@ -10,14 +10,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-/**
- * Менеджер SSH-профилей с:
- * - атомарной записью JSON;
- * - синхронизированным доступом;
- * - корректным обновлением профиля (вариант old->updated);
- * - единственным autoConnect-профилем;
- * - мягкой миграцией формата (если файл пустой/битый).
- */
 public class SSHProfileManager {
 
     private static final String CONFIG_FILE = System.getProperty("user.home")
@@ -25,17 +17,12 @@ public class SSHProfileManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    // Блокировки на чтение/запись файла
     private static final ReentrantReadWriteLock RW = new ReentrantReadWriteLock();
 
-    /** Обёртка для хранения списка профилей. */
     public static class ProfilesConfig {
         public List<SSHConfig> profiles = new ArrayList<>();
     }
 
-    /* ===================== ПУБЛИЧНЫЙ API ===================== */
-
-    /** Вернуть все профили (defensive copy). */
     public static List<SSHConfig> getProfiles() {
         RW.readLock().lock();
         try {
@@ -45,7 +32,6 @@ public class SSHProfileManager {
         }
     }
 
-    /** Первый профиль с autoConnect=true, либо null. */
     public static SSHConfig getAutoConnectProfile() {
         RW.readLock().lock();
         try {
@@ -58,21 +44,14 @@ public class SSHProfileManager {
         }
     }
 
-    /**
-     * Добавить профиль.
-     * Если profile.autoConnect == true — отключим autoConnect у остальных.
-     * Дубликаты (полное совпадение user/host/port/keyPath/auto) не добавляем.
-     */
     public static void addProfile(SSHConfig profile) {
         Objects.requireNonNull(profile, "profile");
         RW.writeLock().lock();
         try {
             ProfilesConfig cfg = loadInternal();
-            // уже есть полный дубликат?
             if (cfg.profiles.stream().anyMatch(p -> equalsFull(p, profile))) {
-                return; // не дублируем
+                return;
             }
-            // если автоконнект — снимаем у остальных
             if (profile.autoConnect()) {
                 cfg.profiles = disableAutoConnectForAll(cfg.profiles);
             }
@@ -83,11 +62,6 @@ public class SSHProfileManager {
         }
     }
 
-    /**
-     * Обновить профиль (БЕЗОПАСНЫЙ ВАРИАНТ): старый -> новый.
-     * Сопоставление происходит по полному совпадению старого профиля (кроме autoConnect? нет — включая).
-     * Если старый профиль не найден — добавим как новый.
-     */
     public static void updateProfile(SSHConfig oldProfile, SSHConfig updatedProfile) {
         Objects.requireNonNull(oldProfile, "oldProfile");
         Objects.requireNonNull(updatedProfile, "updatedProfile");
@@ -103,7 +77,6 @@ public class SSHProfileManager {
                     updated.add(updatedProfile);
                     replaced = true;
                 } else {
-                    // если updated помечен как auto — снимем флаг у остальных
                     if (updatedProfile.autoConnect() && p.autoConnect()) {
                         updated.add(copyWithAuto(p, false));
                     } else {
@@ -113,7 +86,6 @@ public class SSHProfileManager {
             }
 
             if (!replaced) {
-                // старый не найден — добавим новый
                 if (updatedProfile.autoConnect()) {
                     updated = disableAutoConnectForAll(updated);
                 }
@@ -127,7 +99,6 @@ public class SSHProfileManager {
         }
     }
 
-    /** Удалить профиль (сопоставление по sameProfile: user/host/port/keyPath). */
     public static void deleteProfile(SSHConfig profile) {
         Objects.requireNonNull(profile, "profile");
         RW.writeLock().lock();
@@ -140,10 +111,6 @@ public class SSHProfileManager {
         }
     }
 
-    /**
-     * Установить autoConnect для заданного профиля (по sameProfile).
-     * Если профиль не найден — ничего не делаем.
-     */
     public static void setAutoConnect(SSHConfig profile, boolean auto) {
         Objects.requireNonNull(profile, "profile");
         RW.writeLock().lock();
@@ -153,7 +120,6 @@ public class SSHProfileManager {
             boolean found = false;
 
             if (auto) {
-                // один авто — остальные выключаем
                 for (SSHConfig p : cfg.profiles) {
                     if (sameProfile(p, profile)) {
                         result.add(copyWithAuto(profile, true));
@@ -184,8 +150,6 @@ public class SSHProfileManager {
         }
     }
 
-    /* ===================== ВНУТРЕННИЕ УТИЛИТЫ ===================== */
-
     private static boolean sameProfile(SSHConfig a, SSHConfig b) {
         return a.user().equals(b.user()) &&
                 a.host().equals(b.host()) &&
@@ -210,8 +174,6 @@ public class SSHProfileManager {
         return res;
     }
 
-    /* ===================== ЧТЕНИЕ/ЗАПИСЬ JSON ===================== */
-
     private static ProfilesConfig loadInternal() {
         Path path = Path.of(CONFIG_FILE);
         if (!Files.exists(path)) {
@@ -222,22 +184,19 @@ public class SSHProfileManager {
             if (cfg == null || cfg.profiles == null) {
                 return new ProfilesConfig(); // мягкая миграция
             }
-            // Санитация null-списка/элементов
             cfg.profiles.removeIf(Objects::isNull);
             return cfg;
         } catch (Exception e) {
             System.err.println("Fehler beim Lesen der Konfigurationsdatei: " + e.getMessage());
-            return new ProfilesConfig(); // мягкая деградация при битом JSON
+            return new ProfilesConfig();
         }
     }
 
-    /** Атомарная запись: во временный файл, затем move(REPLACE_EXISTING). */
     private static void saveInternal(ProfilesConfig cfg) {
         Path path = Path.of(CONFIG_FILE);
         Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
 
         try {
-            // гарантируем каталог
             if (path.getParent() != null) {
                 Files.createDirectories(path.getParent());
             }
@@ -247,7 +206,6 @@ public class SSHProfileManager {
             }
             Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
-            // если ATOMIC_MOVE недоступен — повторим без него
             try {
                 if (Files.exists(tmp)) {
                     Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
@@ -255,7 +213,6 @@ public class SSHProfileManager {
             } catch (Exception ignored) {}
             System.err.println("Fehler beim Speichern der Konfigurationsdatei: " + e.getMessage());
         } finally {
-            // подчистим tmp на всякий случай
             try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
         }
     }

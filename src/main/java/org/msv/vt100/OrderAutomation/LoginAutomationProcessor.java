@@ -19,8 +19,6 @@ public class LoginAutomationProcessor {
     private final SSHManager sshManager;
     private final ScreenBuffer screenBuffer;
     private final Cursor cursor;
-
-    // Флаг, что автоматический логин уже выполнен (гарантирует однократное срабатывание)
     private static volatile boolean autoLoginPerformed = false;
 
     public LoginAutomationProcessor(TerminalApp terminalApp) {
@@ -35,30 +33,30 @@ public class LoginAutomationProcessor {
             try {
                 processAutoLogin();
             } catch (InterruptedException e) {
-                logger.error("Login automation interrupted", e);
+                logger.error("Login-Automatisierung unterbrochen", e);
                 Thread.currentThread().interrupt();
             } catch (Exception ex) {
-                logger.error("Error during login automation", ex);
+                logger.error("Fehler während der Login-Automatisierung", ex);
             }
         }, "LoginAutomationProcessorThread").start();
     }
 
     private void processAutoLogin() throws InterruptedException, IOException {
         if (autoLoginPerformed) {
-            logger.info("Auto login already performed. Skipping.");
+            logger.info("Auto-Login bereits durchgeführt. Überspringe.");
             return;
         }
 
-        logger.info("Waiting for prompt 'Ihr Kurzzeichen:' in screen buffer...");
+        logger.info("Warte auf Eingabeaufforderung 'Ihr Kurzzeichen:' im Bildschirmpuffer...");
         boolean kurzzeichenOk = waitUntil("'Ihr Kurzzeichen:' im Bildschirmtext", () ->
                 screenBuffer.toString().contains("Ihr Kurzzeichen:")
         );
         if (!kurzzeichenOk || terminalApp.isStopped()) {
-            logger.info("Terminal stopped or timeout. Abort.");
+            logger.info("Terminal gestoppt oder Timeout. Abbruch.");
             return;
         }
 
-        logger.info("Waiting for cursor to reach position 15,45...");
+        logger.info("Warte, bis der Cursor Position 15,45 erreicht...");
         boolean cursorLogin = waitUntil("Cursor bei 15,45", () ->
                 cursor.getCursorPosition().equals("15,36")
         );
@@ -66,43 +64,43 @@ public class LoginAutomationProcessor {
 
         LoginProfile autoLoginProfile = LoginProfileManager.getAutoConnectProfile();
         if (autoLoginProfile != null) {
-            logger.info("Auto-login profile found. Sending username: {}", autoLoginProfile.username());
+            logger.info("Auto-Login-Profil gefunden. Sende Benutzername: {}", autoLoginProfile.username());
             sshManager.send(autoLoginProfile.username());
             sshManager.send("\r");
         } else {
-            logger.info("No auto-login profile marked. Skipping username entry.");
+            logger.info("Kein Auto-Login-Profil markiert. Überspringe Eingabe des Benutzernamens.");
         }
 
-        logger.info("Waiting for prompt 'Ihr  Schutzcode:' in screen buffer...");
+        logger.info("Warte auf Eingabeaufforderung 'Ihr  Schutzcode:' im Bildschirmpuffer...");
         boolean schutzcodeOk = waitUntil("'Ihr  Schutzcode:' im Bildschirmtext", () ->
                 screenBuffer.toString().contains("Ihr  Schutzcode:")
         );
         if (!schutzcodeOk || terminalApp.isStopped()) return;
 
-        logger.info("Waiting for cursor to reach position 17,45...");
+        logger.info("Warte, bis der Cursor Position 17,45 erreicht...");
         boolean cursorPwd = waitUntil("Cursor bei 17,45", () ->
                 cursor.getCursorPosition().equals("17,36")
         );
         if (!cursorPwd || terminalApp.isStopped()) return;
 
         if (autoLoginProfile != null) {
-            logger.info("Sending password for auto-login profile.");
+            logger.info("Sende Passwort für Auto-Login-Profil.");
             sshManager.send(autoLoginProfile.password());
             sshManager.send("\r");
         }
 
-        logger.info("Waiting for post-login prompt 'Bitte Eingabe-Taste druecken' and cursor at 23,55...");
+        logger.info("Warte auf Post-Login-Aufforderung 'Bitte Eingabe-Taste druecken' und Cursor bei 23,55...");
         boolean postLoginPrompt = waitUntil("Bitte Eingabe-Taste druecken + Cursor 23,55", () ->
                 screenBuffer.toString().contains("Bitte Eingabe-Taste druecken")
                         && cursor.getCursorPosition().equals("23,55")
         );
         if (postLoginPrompt && !terminalApp.isStopped()) {
-            logger.info("Prompt detected. Sending Enter.");
+            logger.info("Aufforderung erkannt. Sende Enter.");
             sshManager.send("\r");
         }
 
         autoLoginPerformed = true;
-        logger.info("Auto login process completed.");
+        logger.info("Auto-Login-Prozess abgeschlossen.");
     }
 
 

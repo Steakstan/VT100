@@ -17,7 +17,6 @@ public class CopyRectangularAreaHandler {
 
     public void copyArea(int Pts, int Pls, int Pbs, int Prs,
                          int Ptd, int Pld, int Psrc_page, int Pdst_page) {
-        // Корректируем индексы (нумерация с 1)
         Pts = Math.max(1, Pts);
         Pls = Math.max(1, Pls);
         Pbs = Math.max(1, Pbs);
@@ -28,16 +27,16 @@ public class CopyRectangularAreaHandler {
         int numRows = Pbs - Pts + 1;
         int numCols = Prs - Pls + 1;
 
-        logger.debug("Параметры после корректировки: Pts={}, Pls={}, Pbs={}, Prs={}, Ptd={}, Pld={}, numRows={}, numCols={}",
+        logger.debug("Parameter nach Korrektur: Pts={}, Pls={}, Pbs={}, Prs={}, Ptd={}, Pld={}, numRows={}, numCols={}",
                 Pts, Pls, Pbs, Prs, Ptd, Pld, numRows, numCols);
 
         if (isValidArea(Pts, Pls, numRows, numCols) || isValidArea(Ptd, Pld, numRows, numCols)) {
-            logger.warn("Область копирования выходит за пределы экрана");
+            logger.warn("Kopierbereich liegt außerhalb des Bildschirms");
             return;
         }
 
         copyAreaBetweenPages(Pts - 1, Pls - 1, Ptd - 1, Pld - 1, numRows, numCols, Psrc_page, Pdst_page);
-        logger.info("Копирование области между страницами {} и {} выполнено", Psrc_page, Pdst_page);
+        logger.info("Kopieren des Bereichs zwischen den Seiten {} und {} abgeschlossen", Psrc_page, Pdst_page);
     }
 
     private void copyAreaBetweenPages(int srcRowStart, int srcColStart, int dstRowStart, int dstColStart,

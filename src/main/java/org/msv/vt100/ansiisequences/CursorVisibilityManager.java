@@ -117,7 +117,6 @@ public class CursorVisibilityManager {
                 blinkTimeline = null;
             }
         } catch (Throwable ignore) {
-            // ничего
         }
     }
 

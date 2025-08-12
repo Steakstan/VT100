@@ -63,7 +63,7 @@ public class EraseCharacterHandler {
         col = Math.max(col, left);
         if (col > right) {
             // Cursor is to the right of the effective area -> nothing to do
-            logger.debug("ECH no-op: cursor col {} beyond right margin {} (1-based {}).", col, right, right + 1);
+            logger.debug("ECH keine Aktion: Cursor-Spalte {} außerhalb des rechten Rands {} (1-basiert {}).", col, right, right + 1);
             return;
         }
 
@@ -75,7 +75,7 @@ public class EraseCharacterHandler {
             screenBuffer.setCell(row, c, new Cell(" ", style));
         }
 
-        logger.debug("ECH: erased {} char(s) at row {}, cols {}..{} (1-based).",
+        logger.debug("ECH: {} Zeichen in Zeile {}, Spalten {}..{} gelöscht (1-basiert).",
                 (end - col + 1), row + 1, col + 1, end + 1);
     }
 
@@ -85,7 +85,7 @@ public class EraseCharacterHandler {
         try {
             Matcher m = CSI_ECH.matcher(sequence);
             if (!m.matches()) {
-                logger.debug("Not an ECH sequence, ignored: {}", sequence);
+                logger.debug("Keine ECH-Sequenz, ignoriert: {}", sequence);
                 return 0;
             }
             String grp = m.group(1);
@@ -93,7 +93,7 @@ public class EraseCharacterHandler {
             int v = Integer.parseInt(grp);
             return (v <= 0) ? 1 : v; // non-positive treated as 1
         } catch (Exception e) {
-            logger.debug("Failed to parse ECH '{}': {}", sequence, e.toString());
+            logger.debug("Parsen von ECH '{}' fehlgeschlagen: {}", sequence, e.toString());
             return 1;
         }
     }

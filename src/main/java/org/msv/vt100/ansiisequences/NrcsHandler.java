@@ -49,7 +49,7 @@ public class NrcsHandler {
         this.currentNrcsMode = mode;
         this.nrcsEnabled = true;
         loadMappingFor(mode);
-        logger.debug("NRCS enabled. Mode={}", mode);
+        logger.debug("NRCS aktiviert. Modus={}", mode);
     }
 
     /**
@@ -59,7 +59,7 @@ public class NrcsHandler {
         this.nrcsEnabled = false;
         this.currentNrcsMode = NrcsMode.US;
         loadMappingFor(NrcsMode.US);
-        logger.debug("NRCS disabled.");
+        logger.debug("NRCS deaktiviert.");
     }
 
     /**
@@ -141,7 +141,7 @@ public class NrcsHandler {
 
             default:
                 // Fallback to identity
-                logger.debug("Unknown NRCS mode {}; using US identity mapping.", mode);
+                logger.debug("Unbekannter NRCS-Modus {}; verwende US-Identitätszuordnung.", mode);
         }
 
         // Freeze the map to avoid accidental mutation

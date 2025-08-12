@@ -30,7 +30,7 @@ public class DeliveryDateProcessor {
 
     public void processDeliveryDate(Row row, ExcelOrderData.ColumnIndices indices) throws InterruptedException, IOException {
         System.out.println("-----------------------------------------------------");
-        System.out.println("START processDeliveryDate: Начало обработки заказа aus Excel.");
+        System.out.println("START processDeliveryDate: starting order processing from Excel.");
 
         ExcelOrderData orderData = ExcelOrderData.fromExcelRow(row, indices);
         String orderNumber = orderData.orderNumber();
@@ -69,46 +69,42 @@ public class DeliveryDateProcessor {
             sendDataWithDelay(positionNumber);
             sendDataWithDelay("\r");
 
-            // === NEW: check for "Keine Bestellware" ===
-            // kurze Pause, damit sich der Bildschirm aktualisieren kann
             Thread.sleep(70);
             String initialScreen = getScreenText();
             if (initialScreen.contains("Keine Bestellware")) {
                 System.out.println("INFO: 'Keine Bestellware' erkannt – warte bis die Meldung verschwindet.");
-                // Warte, bis die Meldung komplett weg ist
                 while (getScreenText().contains("Keine Bestellware")) {
                     Thread.sleep(200);
                 }
                 System.out.println("INFO: 'Keine Bestellware' verschwunden – breche Verarbeitung dieses Auftrags ab.");
                 navigateToStartPage();
-                return;  // raus aus processDeliveryDate und weiter mit nächster Zeile
+                return;
             }
-            // =============================================
 
-            // kurze Pause, чтобы экран хоть чуть-чуть подвинулся
+
             Thread.sleep(70);
 
-            // Считываем сразу и курсор, и текст
+
             String screen = getScreenText();
             String cursorPos = cursor.getCursorPosition();
 
-            // Если попали на экран "Bitte ausloesen !" в положении 24,80 — запускаем наш ENTER-loop
+
             if (cursorPos.equals("24,80") && screen.contains("Bitte ausloesen !")) {
-                System.out.println("Detected 'Bitte ausloesen !' — стартуем ENTER-loop.");
-                // пока фраза осталась и курсор всё ещё на 24,80 — шлём ENTER
+                System.out.println("Detected 'Bitte ausloesen !' — starting ENTER loop.");
+
                 while (cursor.getCursorPosition().equals("24,80")
                         && getScreenText().contains("Bitte ausloesen !")) {
                     sendDataWithDelay("\r");
-                    // небольшая пауза, чтобы экран успел обновиться
+
                     Thread.sleep(200);
                 }
                 System.out.println("'Bitte ausloesen !' verschwunden oder Cursor verschoben.");
-                // обновляем screen+cursor на выходе
+
                 screen = getScreenText();
                 cursorPos = cursor.getCursorPosition();
             }
 
-            // дальше твоя стандартная детекция WE-Filiale
+
             weFilialeScreenDetected = cursorPos.equals("9,36")
                     && screen.contains("Vorgesehene WE-Filiale");
         }
@@ -120,7 +116,7 @@ public class DeliveryDateProcessor {
             return;
         }
 
-        // если не WE-Filiale, то ждём OK-промпт и сравниваем дату
+
         if (!weFilialeScreenDetected) {
             if (!waitForOkPromptAndCompareDate(deliveryDate, hasConfirmationCol)) {
                 return;
@@ -157,38 +153,34 @@ public class DeliveryDateProcessor {
             System.out.println("[WARNUNG] Timeout beim Warten auf OK-Prompt.");
             return false;
         }
-
-        // vorhandenes Datum aus Bildschirm (KWxx)
         String existingDate = CellValueExtractor.extractCells(
                 terminalApp.getScreenBuffer(), 9, 37, 38, 39, 40).trim();
         boolean dateMissing = existingDate.isEmpty();
 
-        // Fall 1: Kein Datum ⇒ verarbeiten
+
         if (dateMissing) {
             System.out.println("INFO: Kein vorhandenes Datum – verarbeite Auftrag.");
         } else {
-            // vorhandene und Excel-KW ermitteln (erste beiden Zeichen)
             int existingWeek = Integer.parseInt(existingDate.substring(0, 2));
             int excelWeek    = Integer.parseInt(deliveryDate.substring(0, 2));
             System.out.println("Vergleiche Kalenderwochen: vorhanden ("
                     + existingWeek + "), Excel (" + excelWeek + ").");
 
-            // Fall 2: Excel-KW ≤ vorhandene KW ⇒ skip
+
             if (excelWeek <= existingWeek) {
                 System.out.println("INFO: Excel-KW ≤ vorhandene KW. Verarbeitung wird übersprungen.");
                 navigateToStartPage();
                 return false;
             }
-            // ansonsten (excelWeek > existingWeek) weiterverarbeiten
             System.out.println("Excel-KW > vorhandene KW – verarbeite Auftrag.");
         }
 
-        // Nur hier landen alle Fälle, die wir wirklich weiter bearbeiten wollen:
+
         System.out.println("Bedingung erfüllt. Sende 'N'.");
         sendDataWithDelay("N");
         sendDataWithDelay("\r");
 
-        // ⏳ Warte auf Bildschirm-Update nach 'N'
+
         boolean updated = waitUntil("Bildschirm ändert sich nach 'N'", () -> {
             terminalApp.checkForPause();
             return !getScreenText().contains("OK (J/N/L/T/G)");
@@ -200,14 +192,6 @@ public class DeliveryDateProcessor {
 
         return true;
     }
-
-
-
-
-
-
-
-
 
     private void handleBitteAusloesenLoop() throws IOException, InterruptedException {
         System.out.println("Starte Schleife für 'Bitte ausloesen !'.");
@@ -234,7 +218,7 @@ public class DeliveryDateProcessor {
                 System.out.println("Sende Enter (ausloesen-Schleife).");
                 sendDataWithDelay("\r");
 
-                // Warten, bis Bildschirm sich ändert
+
                 boolean changed = waitUntil("Bildschirm ändert sich nach Enter", () -> {
                     terminalApp.checkForPause();
                     return !getScreenText().equals(before);
@@ -245,7 +229,7 @@ public class DeliveryDateProcessor {
                     break;
                 }
 
-                // Warten auf vollständiges Verschwinden von 'Bitte ausloesen!'
+
                 boolean verschwunden = waitUntil("'Bitte ausloesen !' verschwunden", () -> {
                     terminalApp.checkForPause();
                     String after = getScreenText();
@@ -269,7 +253,7 @@ public class DeliveryDateProcessor {
     private void waitForDeliveryDateInputPrompt(String deliveryDate) throws IOException, InterruptedException {
         System.out.println("Warte auf 'Vorgesehene WE-Filiale' oder 'Bitte ausloesen !'…");
 
-        // 1) Ждём до появления либо WE-Filiale, либо Bitte ausloesen
+
         waitUntil("Cursor=24,80 & 'Bitte ausloesen !' OR Cursor=9,36 & 'Vorgesehene WE-Filiale'", () -> {
             terminalApp.checkForPause();
             String c = cursor.getCursorPosition();
@@ -278,19 +262,19 @@ public class DeliveryDateProcessor {
                     || (c.equals("9,36") && s.contains("Vorgesehene WE-Filiale"));
         });
 
-        // 2) Если это Bitte ausloesen — запускаем ENTER-loop
+
         if (cursor.getCursorPosition().equals("24,80")
                 && getScreenText().contains("Bitte ausloesen !")) {
             System.out.println("'Bitte ausloesen !' erkannt — ENTER-Loop starten.");
             while (cursor.getCursorPosition().equals("24,80")
                     && getScreenText().contains("Bitte ausloesen !")) {
                 sendDataWithDelay("\r");
-                Thread.sleep(200);  // даём экрану обновиться
+                Thread.sleep(200);
             }
             System.out.println("'Bitte ausloesen !' verschwunden oder Cursor verschoben.");
         }
 
-        // 3) Теперь точно ждём WE-Filiale
+
         boolean success = waitUntil("Cursor = 9,36 & Text enthält 'Vorgesehene WE-Filiale'", () -> {
             terminalApp.checkForPause();
             String currCursor = cursor.getCursorPosition();
@@ -306,10 +290,6 @@ public class DeliveryDateProcessor {
         sendDataWithDelay(deliveryDate);
         sendDataWithDelay("\r");
     }
-
-
-
-
 
     private void waitForBestellTerminWarningsToDisappear() throws InterruptedException {
         System.out.println("Überprüfe, ob Meldungen 'Bestell-Termin um ' und 'ueberschritten!' angezeigt werden.");
@@ -338,9 +318,9 @@ public class DeliveryDateProcessor {
         checkForBitteAusloesenNach960();
 
         if (shouldWriteComment()) {
-            waitForEingabenOkPromptAndSendZ();            // Sende 'Z'
-            waitForInternerTextAndComment(deliveryDate);  // Kommentar eingeben
-            waitForTextKZandOQSequence();                 // OQ + Eingabe OK
+            waitForEingabenOkPromptAndSendZ();
+            waitForInternerTextAndComment(deliveryDate);
+            waitForTextKZandOQSequence();
         } else {
             System.out.println("Kommentar deaktiviert – überspringe Eingabe und sende nur Enter.");
             finalEingabenOkEnter();
@@ -401,14 +381,14 @@ public class DeliveryDateProcessor {
     private void checkForBitteAusloesenNach960() throws IOException, InterruptedException {
         System.out.println("Prüfe nach 9,60 auf nächste Eingabeaufforderung...");
 
-        // 1) Warte auf eines der bekannten Screens: Ausloesen, Eingaben OK oder Interner Text
+
         AusloeserStatus status = waitForAusloeserOderAlternative();
         System.out.println("Status nach 9,60: " + status);
 
         switch (status) {
             case BITTE_AUSLOESEN:
                 System.out.println("'Bitte ausloesen !' erkannt. Starte ENTER-Loop.");
-                // ENTER solange die Meldung und der Cursor gleich bleiben
+
                 while (cursor.getCursorPosition().equals("24,80")
                         && getScreenText().contains("Bitte ausloesen !")) {
                     sendDataWithDelay("\r");
@@ -419,7 +399,6 @@ public class DeliveryDateProcessor {
 
             case EINGABEN_OK:
                 System.out.println("'Eingaben OK' erkannt – weiter ohne ENTER-Loop.");
-                // hier geht es direkt weiter in den nächsten Schritt
                 break;
 
             case INTERNE_EINGABE:
@@ -464,7 +443,6 @@ public class DeliveryDateProcessor {
 
         AusloeserStatus status = waitForAusloeserOderAlternative();
 
-        // 🔁 Wenn 'Bitte ausloesen!' zuerst erscheint → Enter-Schleife bis verschwunden
         while (status == AusloeserStatus.BITTE_AUSLOESEN) {
             System.out.println("'Bitte ausloesen !' erkannt. Sende Enter und warte erneut...");
             sendDataWithDelay("\r");
@@ -481,7 +459,6 @@ public class DeliveryDateProcessor {
         sendDataWithDelay("\r");
         Thread.sleep(500);
 
-        // ⌛ Warten auf dreistellige Zahl
         boolean nummerErkannt = waitUntil("Dreistellige Nummer in Zeile 22 erkannt", () -> {
             terminalApp.checkForPause();
             String numberText = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 22, 1, 2, 3);
@@ -491,7 +468,6 @@ public class DeliveryDateProcessor {
 
         if (!nummerErkannt) throw new IOException("Timeout beim Warten auf dreistellige Nummer für Kommentar");
 
-        // 💬 Kommentar erzeugen und senden
         String kw = extractWeekFromDeliveryDate(deliveryDate);
         String template = getUserCommentTemplate();
         String comment = template.replace("**", kw);
@@ -563,7 +539,6 @@ public class DeliveryDateProcessor {
         System.out.println("Erkannt. Sende Enter.");
         sendDataWithDelay("\r");
 
-        // 🔍 Jetzt prüfen, ob nachträglich "Pos-Nr.:" kommt
         handlePossiblePostOkPositionPrompt();
     }
 
@@ -676,14 +651,12 @@ public class DeliveryDateProcessor {
                 break;
             }
 
-            // Sonderfall: direkt auf "Programm - Nr." Bildschirm
             if (cursorBefore.equals("3,24") && screenBefore.contains("Programm - Nr.:")) {
                 System.out.println("Navigation: Bildschirm zeigt 'Programm - Nr.:'. Sende '5.0321'.");
 
                 String snapshotBefore = captureRelevantScreenPart();
                 sendDataWithDelay("5.0321\r");
 
-                // Ждём одно изменение (но не отправляем заново)
                 boolean changed = waitUntil("Bildschirm oder Cursor ändern sich nach '5.0321'", () -> {
                     terminalApp.checkForPause();
                     String snapshotAfter = captureRelevantScreenPart();
@@ -698,7 +671,6 @@ public class DeliveryDateProcessor {
                 }
             }
 
-            // Стандартная команда возврата
             String snapshotBefore = captureRelevantScreenPart();
             sendDataWithDelay("\u001BOQ");
             System.out.println("Sende '\u001BOQ'");
@@ -725,8 +697,6 @@ public class DeliveryDateProcessor {
                 }
 
             } else {
-                // Продолжаем цикл, так как изменения произошли
-                continue;
             }
         }
     }
@@ -788,7 +758,6 @@ public class DeliveryDateProcessor {
         ExcelOrderData.ColumnIndices indices = ExcelOrderData.detectAllColumns(sheet, terminalApp);
 
         Iterator<Row> rows = sheet.iterator();
-        // Пропускаем заголовок
         if (rows.hasNext()) rows.next();
 
         while (rows.hasNext()) {
@@ -799,7 +768,7 @@ public class DeliveryDateProcessor {
             terminalApp.checkForPause();
             Row row = rows.next();
             System.out.println("Verarbeite nächste Zeile.");
-            processDeliveryDate( row, indices);  // ✅ теперь передаём sheet и индексы
+            processDeliveryDate( row, indices);
         }
 
         System.out.println("Verarbeitung aller Bestellungen abgeschlossen.");
@@ -861,7 +830,6 @@ public class DeliveryDateProcessor {
             return false;
         });
 
-        // ВАЖНО: надо вызывать status.get() ТОЛЬКО после завершения waitUntil
         return erkannt ? status.get() : AusloeserStatus.NICHTS;
     }
 

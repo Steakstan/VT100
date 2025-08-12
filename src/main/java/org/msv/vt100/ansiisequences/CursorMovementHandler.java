@@ -48,7 +48,7 @@ public class CursorMovementHandler {
                 row1 = parse1BasedOrDefault(m.group(1));
                 col1 = parse1BasedOrDefault(m.group(2));
             } else {
-                logger.debug("Not a CUP/HVP sequence, ignored: {}", sequence);
+                logger.debug("Keine CUP/HVP-Sequenz, ignoriert: {}", sequence);
                 return;
             }
         }
@@ -59,7 +59,7 @@ public class CursorMovementHandler {
 
         // Delegate clamping and DECOM/DECVLRM math to CursorController
         cursorController.setCursorPosition(row0, col0);
-        logger.debug("CUP/HVP requested position: row={}, col={} (1-based).", row1, col1);
+        logger.debug("CUP/HVP angeforderte Position: Zeile={}, Spalte={} (1-basiert).", row1, col1);
     }
 
     // ---- helpers ----

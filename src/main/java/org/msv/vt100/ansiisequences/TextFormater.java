@@ -114,7 +114,7 @@ public class TextFormater {
             try {
                 code = Integer.parseInt(p);
             } catch (NumberFormatException e) {
-                logger.debug("Ignoring non-numeric SGR param: {}", p);
+                logger.debug("Nichtnumerischen SGR-Parameter ignoriert: {}", p);
                 continue;
             }
 
@@ -128,7 +128,7 @@ public class TextFormater {
             if (applyColor(code)) continue;
 
             // Not implemented attributes are ignored, but logged at debug to avoid noise
-            logger.debug("Unknown/unsupported SGR code: {}", code);
+            logger.debug("Unbekannter/nicht unterstützter SGR-Code: {}", code);
         }
 
         updateCurrentStyle();
@@ -147,7 +147,7 @@ public class TextFormater {
 
         // Reset line attributes as well
         lineAttributeHandler.resetAllLineAttributes();
-        logger.debug("All text and line attributes have been reset.");
+        logger.debug("Alle Text- und Zeilenattribute wurden zurückgesetzt.");
     }
 
     // ----- SGR helpers -----
@@ -232,52 +232,52 @@ public class TextFormater {
 
     public void enableReverseVideo() {
         activeFormats.add(TextFormatMode.REVERSE_VIDEO);
-        logger.debug("Reverse video enabled.");
+        logger.debug("Reverse Video aktiviert.");
     }
 
     public void disableReverseVideo() {
         activeFormats.remove(TextFormatMode.REVERSE_VIDEO);
-        logger.debug("Reverse video disabled.");
+        logger.debug("Reverse Video deaktiviert.");
     }
 
     public void enableUnderline() {
         activeFormats.add(TextFormatMode.UNDERLINE);
-        logger.debug("Underline enabled.");
+        logger.debug("Unterstreichung aktiviert.");
     }
 
     public void disableUnderline() {
         activeFormats.remove(TextFormatMode.UNDERLINE);
-        logger.debug("Underline disabled.");
+        logger.debug("Unterstreichung deaktiviert.");
     }
 
     public void enableBlink() {
         activeFormats.add(TextFormatMode.BLINK);
-        logger.debug("Blink enabled.");
+        logger.debug("Blinken aktiviert.");
     }
 
     public void disableBlink() {
         activeFormats.remove(TextFormatMode.BLINK);
-        logger.debug("Blink disabled.");
+        logger.debug("Blinken deaktiviert.");
     }
 
     public void enableBold() {
         activeFormats.add(TextFormatMode.BOLD);
-        logger.debug("Bold enabled.");
+        logger.debug("Fett aktiviert.");
     }
 
     public void disableBold() {
         activeFormats.remove(TextFormatMode.BOLD);
-        logger.debug("Bold disabled.");
+        logger.debug("Fett deaktiviert.");
     }
 
     public void enableConceal() {
         activeFormats.add(TextFormatMode.CONCEAL);
-        logger.debug("Conceal enabled.");
+        logger.debug("Verbergen aktiviert.");
     }
 
     public void disableConceal() {
         activeFormats.remove(TextFormatMode.CONCEAL);
-        logger.debug("Conceal disabled.");
+        logger.debug("Verbergen deaktiviert.");
     }
 
     /**
@@ -328,13 +328,13 @@ public class TextFormater {
         return currentStyle;
     }
 
-    public String getEffectiveForeground() {  // с учётом REVERSE/CONCEAL
+    public String getEffectiveForeground() {
         String effFg = currentForeground != null ? currentForeground : DEFAULT_FG;
         String effBg = currentBackground != null ? currentBackground : DEFAULT_BG;
         if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
             String swapBg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
-            effBg = effFg;            // фон становится прежним fg
-            effFg = swapBg;           // текст — прежний bg (с подменой transparent->black)
+            effBg = effFg;
+            effFg = swapBg;
         }
         if (activeFormats.contains(TextFormatMode.CONCEAL)) {
             effFg = "transparent";
@@ -342,11 +342,11 @@ public class TextFormater {
         return effFg;
     }
 
-    public String getEffectiveBackground() {  // то же, но возврат bg
+    public String getEffectiveBackground() {
         String effFg = currentForeground != null ? currentForeground : DEFAULT_FG;
         String effBg = currentBackground != null ? currentBackground : DEFAULT_BG;
         if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
-            effBg = effFg; // при реверсе фон = прежний fg
+            effBg = effFg;
         }
         return effBg;
     }
@@ -354,7 +354,6 @@ public class TextFormater {
     /** Стиль для «заливки фоном» при стирании/вставке/прокрутке */
     public String getEraseFillStyle() {
         String bg = getEffectiveBackground();
-        // для пробела нам важен именно фон; fill можно оставить любым
         return "fill: " + getEffectiveForeground() + "; background: " + bg + "; underline: false; font-weight: normal;";
     }
 

@@ -97,6 +97,13 @@
         </dependency>
     </dependencies>
 
+    <repositories>
+        <repository>
+            <id>openjfx-releases</id>
+            <url>https://nexus.gluonhq.com/nexus/content/repositories/releases/</url>
+        </repository>
+    </repositories>
+
     <build>
         <plugins>
             <!-- Java compiler plugin -->
@@ -111,11 +118,11 @@
 
             <!-- JavaFX Maven Plugin -->
             <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-maven-plugin</artifactId>
+                    <version>0.0.8</version>
                 <configuration>
-                    <mainClass>org.msv.vt100.HelloApplication</mainClass>
+                    <mainClass>org.msv.vt100.TerminalApp</mainClass>
                 </configuration>
                 <executions>
                     <execution>

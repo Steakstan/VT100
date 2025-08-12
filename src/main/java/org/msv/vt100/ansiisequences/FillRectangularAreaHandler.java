@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
  * - Coordinates are clamped to the screen. Empty intersection => no-op.
  *
  * Notes:
- * - По стандарту DECFRA рисует «current rendition». Поэтому используем текущий стиль TextFormater
- *   (включая реверс), а не дефолт.
+ * - DECFRA uses the current rendition, so we apply the current TextFormater style
+ *   (including reverse) instead of defaults.
  */
 public class FillRectangularAreaHandler {
 
@@ -61,7 +61,7 @@ public class FillRectangularAreaHandler {
     public void handleDECFRA(String sequence) {
         Matcher m = CSI_DECFRA.matcher(sequence);
         if (!m.matches()) {
-            logger.debug("Not a DECFRA sequence, ignored: {}", sequence);
+            logger.debug("Keine DECFRA-Sequenz, ignoriert: {}", sequence);
             return;
         }
 
@@ -107,7 +107,7 @@ public class FillRectangularAreaHandler {
 
         // Check for empty intersection
         if (Pts > Pbs || Pls > Prs) {
-            logger.debug("DECFRA intersection is empty; nothing to fill. Rect after clamp: ({},{} → {},{})",
+            logger.debug("DECFRA-Schnittmenge ist leer; nichts zu füllen. Rechteck nach Begrenzung: ({},{} → {},{})",
                     Pts, Pls, Pbs, Prs);
             return;
         }
@@ -116,14 +116,13 @@ public class FillRectangularAreaHandler {
         char fillChar = (char) (Pch & 0xFFFF);
         fillArea(Pts - 1, Pls - 1, Pbs - 1, Prs - 1, String.valueOf(fillChar));
 
-        logger.debug("DECFRA filled area ({},{} → {},{}) with '{}'(U+{}).",
+        logger.debug("DECFRA füllte Bereich ({},{} → {},{}) mit '{}'(U+{}).",
                 Pts, Pls, Pbs, Prs, printable(fillChar), String.format("%04X", (int) fillChar));
     }
 
     // ---- internals ----
 
     private void fillArea(int top, int left, int bottom, int right, String ch) {
-        // используем текущий стиль (включая реверс), чтобы фон был корректный
         String style = (textFormater != null) ? textFormater.getCurrentStyle() : StyleUtils.getDefaultStyle();
         for (int row = top; row <= bottom; row++) {
             for (int col = left; col <= right; col++) {

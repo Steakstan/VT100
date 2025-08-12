@@ -19,7 +19,6 @@ public class LoginProfileManager {
     public static void addProfile(LoginProfile profile) {
         List<LoginProfile> profiles = loadProfiles();
         if (profile.autoConnect()) {
-            // Если новый профиль отмечен для автоподключения, сбрасываем у остальных
             List<LoginProfile> updated = new ArrayList<>();
             for (LoginProfile p : profiles) {
                 if (p.autoConnect()) {

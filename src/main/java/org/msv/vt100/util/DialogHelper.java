@@ -14,13 +14,10 @@ import javafx.stage.Stage;
 
 public class DialogHelper {
 
-    /**
-     * Центрирует диалог относительно окна-родителя.
-     * Если окно выходит за границы экрана, оно сдвигается внутрь.
-     */
+
     public static void centerDialogOnOwner(Stage dialog, Stage owner) {
         Platform.runLater(() -> {
-            dialog.sizeToScene(); // Убедимся, что размеры рассчитаны
+            dialog.sizeToScene();
 
             double centerX = owner.getX() + owner.getWidth() / 2 - dialog.getWidth() / 2;
             double centerY = owner.getY() + owner.getHeight() / 2 - dialog.getHeight() / 2;
@@ -39,9 +36,6 @@ public class DialogHelper {
         });
     }
 
-    /**
-     * Позволяет перетаскивать диалоговое окно, зажав мышью любой элемент (например, заголовок).
-     */
     public static void enableDragging(Stage dialog, Node draggableNode) {
         final Delta dragDelta = new Delta();
 
@@ -56,7 +50,6 @@ public class DialogHelper {
 
             Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
 
-            // Ограничим перемещение рамками экрана
             if (newX >= bounds.getMinX() && newX + dialog.getWidth() <= bounds.getMaxX()) {
                 dialog.setX(newX);
             }

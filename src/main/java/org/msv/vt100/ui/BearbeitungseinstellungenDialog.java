@@ -27,7 +27,6 @@ public class BearbeitungseinstellungenDialog {
     private static final String DEFAULT_COMMENT =
             "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
 
-    // Значения операций — замените на ваши реальные, если они другие
     private static final int OP_DELIVERY_AND_AB = 4;
     private static final int OP_COMMENTS_ONLY = 2;
 
@@ -58,7 +57,6 @@ public class BearbeitungseinstellungenDialog {
         grid.setVgap(10);
         grid.setPadding(new Insets(10));
 
-        // Operation
         Label operationLabel = new Label("Operation:");
         operationLabel.getStyleClass().add("dialog-label-turquoise");
 
@@ -71,8 +69,6 @@ public class BearbeitungseinstellungenDialog {
         operationComboBox.setPrefWidth(300);
         operationComboBox.setPrefHeight(30);
         operationComboBox.getStyleClass().add("custom-combobox");
-
-        // Выпадающее — белый текст
         operationComboBox.setCellFactory(list -> new ListCell<>() {
             @Override protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -88,7 +84,6 @@ public class BearbeitungseinstellungenDialog {
             }
         });
 
-        // Datei-Auswahl
         Label fileLabel = new Label("Datei auswählen:");
         fileLabel.getStyleClass().add("dialog-label-turquoise");
 
@@ -102,7 +97,6 @@ public class BearbeitungseinstellungenDialog {
         HBox fileBox = new HBox(5, filePathField, browseButton);
         fileBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Kommentar
         commentCheckBox = new CheckBox("Kommentar schreiben");
         commentCheckBox.setSelected(false);
         commentCheckBox.getStyleClass().add("dialog-label-turquoise");
@@ -117,7 +111,6 @@ public class BearbeitungseinstellungenDialog {
         commentField.setPrefHeight(30);
         commentField.getStyleClass().add("dialog-text-field");
 
-        // Ограничение длины коммента — через TextFormatter (максимально стабильно)
         commentField.setTextFormatter(new TextFormatter<>(change -> {
             String newText = change.getControlNewText();
             return newText.length() <= MAX_COMMENT_LEN ? change : null;
@@ -150,7 +143,6 @@ public class BearbeitungseinstellungenDialog {
         commentBox.getStyleClass().add("comment-box-background");
         commentBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Buttons
         Button startButton = new Button("Verarbeitung starten");
         startButton.getStyleClass().add("dialog-button");
         startButton.setOnAction(e -> startProcessing());
@@ -161,7 +153,6 @@ public class BearbeitungseinstellungenDialog {
 
         HBox buttonBox = DialogHelper.createDialogFooter(startButton, cancelButton);
 
-        // Layout
         grid.add(operationLabel, 0, 0);
         grid.add(operationComboBox, 1, 0);
         grid.add(fileLabel, 0, 1);
@@ -181,7 +172,6 @@ public class BearbeitungseinstellungenDialog {
 
         Scene scene = new Scene(root, 530, 300);
         scene.setFill(Color.TRANSPARENT);
-        // Стили подключаем «мягко»
         addStylesheetIfExists(scene, "/org/msv/vt100/ui/styles/base.css");
         addStylesheetIfExists(scene, "/org/msv/vt100/ui/styles/buttons.css");
         addStylesheetIfExists(scene, "/org/msv/vt100/ui/styles/dialogs.css");
@@ -199,7 +189,6 @@ public class BearbeitungseinstellungenDialog {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Datei auswählen");
 
-        // Начальная директория — из prefs
         String lastDir = prefs.get(PREF_LAST_DIR, null);
         if (lastDir != null) {
             File dir = new File(lastDir);
@@ -215,7 +204,6 @@ public class BearbeitungseinstellungenDialog {
         File selected = fileChooser.showOpenDialog(dialog);
         if (selected != null) {
             filePathField.setText(selected.getAbsolutePath());
-            // Запомним директорию
             File parent = selected.getParentFile();
             if (parent != null && parent.isDirectory()) {
                 prefs.put(PREF_LAST_DIR, parent.getAbsolutePath());
@@ -242,11 +230,9 @@ public class BearbeitungseinstellungenDialog {
         final boolean shouldWriteComment = commentCheckBox.isSelected();
         final String commentText = shouldWriteComment ? commentField.getText().trim() : "";
 
-        // Применяем настройки в приложении (в FX-потоке)
         terminalApp.setShouldWriteComment(shouldWriteComment);
         terminalApp.setCommentText(commentText);
 
-        // Запускаем фоновую обработку
         dialog.close();
         terminalApp.showProcessingButtons();
 
@@ -258,7 +244,6 @@ public class BearbeitungseinstellungenDialog {
                     terminalApp.hideProcessingButtons();
                 });
             } catch (InterruptedException ie) {
-                // штатная остановка
                 Platform.runLater(() -> {
                     new Alert(Alert.AlertType.INFORMATION, "Verarbeitung gestoppt.", ButtonType.OK).showAndWait();
                     terminalApp.hideProcessingButtons();

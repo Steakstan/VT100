@@ -39,7 +39,6 @@ public class LogSettingsDialog {
         dialog.initStyle(StageStyle.TRANSPARENT);
         dialog.setTitle("Log Einstellungen");
 
-        // HEADER (с закруглёнными верхними углами)
         HBox header = new HBox();
         header.getStyleClass().add("dialog-header");
 
@@ -55,7 +54,6 @@ public class LogSettingsDialog {
 
         header.getChildren().addAll(titleLabel, spacer, closeButton);
 
-        // GRID (с прямыми верхними и скруглёнными нижними углами + рамкой)
         GridPane grid = new GridPane();
         grid.getStyleClass().add("dialog-grid");
         grid.setHgap(10);
@@ -103,14 +101,12 @@ public class LogSettingsDialog {
         HBox buttonBox = new HBox(10, saveButton, cancelButton);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
 
-        // Заполнение сетки
         grid.add(pathLabel, 0, 0);
         grid.add(pathBox, 1, 0);
         grid.add(enableLabel, 0, 1);
         grid.add(enableLoggingCheckBox, 1, 1);
         grid.add(buttonBox, 1, 2);
 
-        // КОРНЕВОЙ КОНТЕЙНЕР: объединение header + content
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);

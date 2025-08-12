@@ -83,7 +83,6 @@ public class TerminalDialog {
 
         dialog.setScene(scene);
 
-        // Центрируем по родителю, если он передан
         if (ownerStage != null) {
             DialogHelper.centerDialogOnOwner(dialog, ownerStage);
         }
@@ -91,9 +90,6 @@ public class TerminalDialog {
         dialog.showAndWait();
     }
 
-
-
-    // Упрощённые методы
     public static void showError(String msg, Stage primaryStage) {
         show(DialogType.ERROR, msg, primaryStage);
     }
@@ -101,12 +97,4 @@ public class TerminalDialog {
     public static void showInfo(String msg, Stage primaryStage) {
         show(DialogType.INFO, msg, primaryStage);
     }
-
-    /*public static void showWarning(String msg, Stage primaryStage) {
-        show(DialogType.WARNING, msg, primaryStage);
-    }
-
-    public static void showConfirm(String msg, Stage primaryStage) {
-        show(DialogType.CONFIRM, msg, primaryStage);
-    }*/
 }

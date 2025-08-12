@@ -45,8 +45,8 @@ final class TerminalRenderer {
                 double x0 = Math.floor(x);
                 double x1 = Math.ceil(x + w);
 
-                double y0 = Math.floor(y) - 1;                    // << overdraw вверх на 1 px
-                double y1 = Math.ceil(y + cellHeight) + 1;        // << overdraw вниз на 1 px
+                double y0 = Math.floor(y) - 1;
+                double y1 = Math.ceil(y + cellHeight) + 1;
                 if (y0 < 0) y0 = 0;
                 if (y1 > canvasH) y1 = canvasH;
 
@@ -105,15 +105,13 @@ final class TerminalRenderer {
             gc.setFont(base.isBold() ? fonts.bold() : fonts.normal());
             gc.setFill(styles.paletteColor(base.fgIdx));
 
-            // Подчеркиваем весь ран, включая пробелы
             if (base.isUnderline()) {
-                double uy = Math.floor((r + 1) * cellHeight) - 1.0; // вместо r*cellHeight + cellHeight - 0.5
+                double uy = Math.floor((r + 1) * cellHeight) - 1.0;
                 gc.setLineWidth(1);
                 gc.setStroke(styles.paletteColor(base.fgIdx));
                 gc.strokeLine(start * cellWidth, uy, c * cellWidth, uy);
             }
 
-            // Рисуем только видимые глифы
             for (int k = start; k < c; k++) {
                 String s = screenBuffer.getVisibleCell(r, k).character();
                 if (s != null && !s.isBlank()) {

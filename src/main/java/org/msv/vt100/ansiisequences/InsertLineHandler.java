@@ -60,7 +60,7 @@ public class InsertLineHandler {
 
         // Outside of scrolling region -> no-op
         if (currentRow < top || currentRow > bottom) {
-            logger.debug("IL ignored: cursor row {} outside scrolling region {}..{} (1-based).",
+            logger.debug("IL ignoriert: Cursorzeile {} außerhalb des Scrollbereichs {}..{} (1-basiert).",
                     currentRow + 1, top + 1, bottom + 1);
             return;
         }
@@ -76,7 +76,7 @@ public class InsertLineHandler {
         // If cursor is at the very top of the region, scrolling down by n is equivalent
         if (currentRow == top) {
             scrollingRegionHandler.scrollDownWithinRegion(n);
-            logger.debug("IL executed via region scroll-down by {} line(s) at top.", n);
+            logger.debug("IL durch Regions-Scroll-Down um {} Zeile(n) oben ausgeführt.", n);
             return;
         }
 
@@ -88,7 +88,7 @@ public class InsertLineHandler {
             clearLine(row, left, right);
         }
 
-        logger.debug("IL inserted {} line(s) at row {} within region {}..{}, cols {}..{} (1-based).",
+        logger.debug("IL hat {} Zeile(n) bei Zeile {} innerhalb Bereich {}..{}, Spalten {}..{} eingefügt (1-basiert).",
                 n, currentRow + 1, top + 1, bottom + 1, left + 1, right + 1);
     }
 
@@ -98,7 +98,7 @@ public class InsertLineHandler {
         try {
             Matcher m = CSI_IL.matcher(sequence);
             if (!m.matches()) {
-                logger.debug("Not an IL sequence, ignored: {}", sequence);
+                logger.debug("Keine IL-Sequenz, ignoriert: {}", sequence);
                 return 0;
             }
             String grp = m.group(1);
@@ -106,7 +106,7 @@ public class InsertLineHandler {
             int val = Integer.parseInt(grp);
             return (val <= 0) ? 1 : val; // VT semantics: non-positive -> treat as 1
         } catch (Exception e) {
-            logger.debug("Failed to parse IL '{}': {}", sequence, e.toString());
+            logger.debug("Parsen von IL '{}' fehlgeschlagen: {}", sequence, e.toString());
             return 1;
         }
     }
