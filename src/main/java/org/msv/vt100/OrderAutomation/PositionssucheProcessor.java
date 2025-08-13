@@ -130,7 +130,7 @@ public class PositionssucheProcessor {
             Map<String, Row> processedRowsForOrder = new HashMap<>();
             if (terminalApp.isStopped()) break;
             terminalApp.checkForPause();
-            while (!getCursorPosition().equals("3,13")) {
+            while (!cursor.getCursorPosition().equals("3,13")) {
                 if (terminalApp.isStopped()) break;
                 terminalApp.checkForPause();
                 waitForStableScreenSnapshot(Duration.ofSeconds(1), Duration.ofMillis(50));
@@ -149,7 +149,7 @@ public class PositionssucheProcessor {
                 resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                 sendDataWithDelay("\r");
                 Thread.sleep(70);
-                String currentCursor = getCursorPosition();
+                String currentCursor = cursor.getCursorPosition();
                 if (currentCursor.equals("23,10")) {
                     resultRowIndex = scanLinesAndWriteMatches(screenBuffer, resultSheet, firmNumbers, order, resultRowIndex, defaultCellStyle, processedRowsForOrder);
                     sendDataWithDelay("\u001BOQ");
@@ -172,16 +172,6 @@ public class PositionssucheProcessor {
         resultWorkbook.close();
     }
 
-    private String getCursorPosition() throws InterruptedException {
-        final String[] cursorPosition = new String[1];
-        CountDownLatch latch = new CountDownLatch(1);
-        Platform.runLater(() -> {
-            cursorPosition[0] = (cursor.getRow() + 1) + "," + (cursor.getColumn() + 1);
-            latch.countDown();
-        });
-        latch.await();
-        return cursorPosition[0];
-    }
 
     private int scanLinesAndWriteMatches(ScreenBuffer buffer, Sheet resultSheet, String[] firmNumbers, String order,
                                          int resultRowIndex, CellStyle defaultCellStyle, Map<String, Row> processedRows) throws Exception {
@@ -235,7 +225,7 @@ public class PositionssucheProcessor {
             }
 
             if (!pageTransitioned) {
-                String currentCursor = getCursorPosition();
+                String currentCursor = cursor.getCursorPosition();
                 if (currentCursor.equals("23,10")) {
                     sendDataWithDelay("\u001BOQ");
                     Thread.sleep(70);

@@ -103,12 +103,13 @@ final class TerminalRenderer {
             }
 
             gc.setFont(base.isBold() ? fonts.bold() : fonts.normal());
-            gc.setFill(styles.paletteColor(base.fgIdx));
+            var textColor = base.fgIdx >= 0 ? styles.paletteColor(base.fgIdx) : Color.TRANSPARENT;
+            gc.setFill(textColor);
 
-            if (base.isUnderline()) {
+            if (base.isUnderline() && base.fgIdx >= 0) {
                 double uy = Math.floor((r + 1) * cellHeight) - 1.0;
                 gc.setLineWidth(1);
-                gc.setStroke(styles.paletteColor(base.fgIdx));
+                gc.setStroke(textColor);
                 gc.strokeLine(start * cellWidth, uy, c * cellWidth, uy);
             }
 

@@ -11,17 +11,17 @@ public class ScreenTextDetector {
     }
 
     public boolean isWareneingangDisplayed() {
-        String screenText = screenBuffer.toString();
+        String screenText = screenBuffer.toStringVisible();
         return screenText.contains("Wareneingang");
     }
 
     public boolean isAchtungDisplayed() {
-        String screenText = screenBuffer.toString();
+        String screenText = screenBuffer.toStringVisible();
         return screenText.contains("Aenderungsauftrag vorhanden");
     }
 
     public String getScreenText() {
-        return String.valueOf(screenBuffer);
+        return screenBuffer.toStringVisible();
     }
 
 }

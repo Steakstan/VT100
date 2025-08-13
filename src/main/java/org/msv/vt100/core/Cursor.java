@@ -54,7 +54,8 @@ public class Cursor {
             if (column < maxColumns - 1) {
                 column++;
             } else if (row < maxRows - 1) {
-                column = maxColumns - 1;
+                row++;
+                column = 0;
             }
             positionChanged.signalAll();
         } finally {

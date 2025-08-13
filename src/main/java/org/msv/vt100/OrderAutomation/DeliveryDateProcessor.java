@@ -685,16 +685,6 @@ public class DeliveryDateProcessor {
         return snapshot.toString();
     }
 
-    private boolean hasRelevantScreenChanged(String previousSnapshot, String previousCursor) throws InterruptedException {
-        String currentSnapshot = captureRelevantScreenPart();
-        String currentCursor = cursor.getCursorPosition();
-        boolean changed = !previousSnapshot.equals(currentSnapshot) && !previousCursor.equals(currentCursor);
-        System.out.println("[DEBUG] Snapshot geändert? " + !previousSnapshot.equals(currentSnapshot) +
-                " | Cursor geändert? " + !previousCursor.equals(currentCursor));
-        return changed;
-    }
-
-
 
     private String extractWeekFromDeliveryDate(String deliveryDate) {
         System.out.println("Extrahiere Kalenderwoche aus Lieferdatum: " + deliveryDate);
@@ -725,6 +715,10 @@ public class DeliveryDateProcessor {
         System.out.println("Starte Verarbeitung mehrerer Bestellungen...");
 
         ExcelOrderData.ColumnIndices indices = ExcelOrderData.detectAllColumns(sheet, terminalApp);
+        if (indices == null) {
+            System.out.println("Spaltenerkennung fehlgeschlagen – Verarbeitung wird abgebrochen.");
+            return;
+        }
 
         Iterator<Row> rows = sheet.iterator();
         if (rows.hasNext()) rows.next();

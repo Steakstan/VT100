@@ -1,8 +1,12 @@
 package org.msv.vt100.OrderAutomation;
 
 import org.apache.poi.ss.usermodel.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FileExtractor {
+
+    private static final Logger logger = LoggerFactory.getLogger(FileExtractor.class);
 
     public static String extractCellValueAsString(Cell cell) {
         if (cell == null) return "";
@@ -34,7 +38,8 @@ public class FileExtractor {
                     return "";
             }
         } catch (Exception e) {
-            return "";
+            logger.error("Error extracting cell value", e);
+            throw new IllegalStateException("Unable to extract cell value", e);
         }
     }
 

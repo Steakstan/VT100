@@ -27,6 +27,7 @@ final class StyleRegistry {
     }
 
     Color paletteColor(short idx) {
+        if (idx < 0 || idx >= palette.size()) return Color.TRANSPARENT;
         return palette.get(idx);
     }
 
