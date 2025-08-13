@@ -135,10 +135,8 @@ final class TerminalRenderer {
             char cc = ch.charAt(0);
             double x = c * cellWidth;
             double y = r * cellHeight;
-            double w = cellWidth;
-            double h = cellHeight;
 
-            drawBoxCharacter(gc, cc, x, y, w, h, styles.paletteColor(sk.fgIdx));
+            drawBoxCharacter(gc, cc, x, y, cellWidth, cellHeight, styles.paletteColor(sk.fgIdx));
         }
     }
 
@@ -149,13 +147,11 @@ final class TerminalRenderer {
         Color color = styles.paletteColor(sk.fgIdx);
         double x = col * cellWidth;
         double y = row * cellHeight;
-        double w = cellWidth;
-        double h = cellHeight;
         gc.setFill(color);
-        gc.fillRect(x, y, w, 1);
-        gc.fillRect(x, y + h , w, 1);
-        gc.fillRect(x, y, 1, h);
-        gc.fillRect(x + w , y, 1, h);
+        gc.fillRect(x, y, cellWidth, 1);
+        gc.fillRect(x, y + cellHeight, cellWidth, 1);
+        gc.fillRect(x, y, 1, cellHeight);
+        gc.fillRect(x + cellWidth, y, 1, cellHeight);
     }
 
     private static boolean isBoxDrawingChar(String ch) {

@@ -9,13 +9,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Implements erase operations (ED/EL/ECH family) and line deletion within the scrolling region.
- *
  * Notes on margins and regions:
  * - EL/ECH honor DECVLRM: operations are restricted to [leftMargin..rightMargin].
  * - ED(0) "from cursor to end of screen" and ED(1) "from start to cursor" honor margins horizontally
  *   to match typical app expectations in margin mode (consistent with existing codebase).
  * - ED(2) "entire screen" explicitly ignores L/R margins and clears full width of all rows).
- *
  * Scrolling region:
  * - deleteLines (DL) only acts when the cursor is inside the scrolling region and respects DECVLRM horizontally.
  */
@@ -66,32 +64,13 @@ public class ErasingSequences {
         });
     }
 
-    /** ED(1): Clear from start of screen to cursor (rows above cursor fully; this row from left to cursor). */
-    public void clearFromStartOfScreenToCursor() {
-        performWithCursorRestore(() -> {
-            int row = cursor.getRow();
-            int col = Math.min(cursor.getColumn(), getRightMargin());
-
-            // 1) Clear all lines before current (within margins)
-            for (int r = 0; r < row; r++) {
-                clearLineWithinMargins(r);
-            }
-
-            // 2) Clear from left margin to cursor in current row
-            clearRangeInLine(row, getLeftMargin(), col);
-
-            logger.debug("ED(1): vom Bildschirmanfang bis zum Cursor gelöscht, endet bei Zeile {}, Spalte {} (1-basiert).",
-                    row + 1, col + 1);
-        });
-    }
-
     /** ED(2): Clear entire screen (ignores L/R margins; clears full width of all rows). */
     public void clearEntireScreen() {
         performWithCursorRestore(() -> {
             int rows = screenBuffer.getRows();
             int cols = screenBuffer.getColumns();
             for (int r = 0; r < rows; r++) {
-                clearRangeInLineFullWidth(r, 0, cols - 1);
+                clearRangeInLineFullWidth(r, cols - 1);
             }
             logger.debug("ED(2): gesamten Bildschirm gelöscht (volle Breite, alle Zeilen).");
         });
@@ -114,17 +93,6 @@ public class ErasingSequences {
             int end = getRightMargin();
             clearRangeInLine(row, start, end);
             logger.debug("EL(0): Zeile {} von Spalte {} bis {} gelöscht (1-basiert).", row + 1, start + 1, end + 1);
-        });
-    }
-
-    /** EL(1): Clear from start of line to cursor (within margins). */
-    public void clearFromStartOfLineToCursor() {
-        performWithCursorRestore(() -> {
-            int row = cursor.getRow();
-            int start = getLeftMargin();
-            int end = Math.min(cursor.getColumn(), getRightMargin());
-            clearRangeInLine(row, start, end);
-            logger.debug("EL(1): Zeile {} von Spalte {} bis {} gelöscht (1-basiert).", row + 1, start + 1, end + 1);
         });
     }
 
@@ -184,9 +152,9 @@ public class ErasingSequences {
     }
 
     /** Clears a full line range ignoring margins (used by ED(2)). */
-    private void clearRangeInLineFullWidth(int row, int startCol, int endCol) {
+    private void clearRangeInLineFullWidth(int row, int endCol) {
         String style = eraseStyle();
-        for (int col = startCol; col <= endCol; col++) {
+        for (int col = 0; col <= endCol; col++) {
             screenBuffer.setCell(row, col, new Cell(" ", style));
         }
     }

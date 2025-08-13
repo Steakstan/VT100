@@ -11,14 +11,12 @@ import java.util.regex.Pattern;
 
 /**
  * Handles DECFRA (Fill Rectangular Area): CSI Pch;Pts;Pls;Pbs;Prs $x
- *
  * Semantics:
  * - Fills the rectangle from (Pts,Pls) to (Pbs,Prs) with the given character Pch.
  * - Coordinates are 1-based and inclusive.
  * - When DECVLRM is enabled, the effective fill area is intersected with current L/R margins.
  * - When a scrolling region (DECSTBM) is set, the effective fill area is intersected with its vertical bounds.
  * - Coordinates are clamped to the screen. Empty intersection => no-op.
- *
  * Notes:
  * - DECFRA uses the current rendition, so we apply the current TextFormater style
  *   (including reverse) instead of defaults.
@@ -76,10 +74,10 @@ public class FillRectangularAreaHandler {
         int Prs = parseOrDefault(m.group(5), cols);
 
         // Clamp coordinates to screen bounds [1..rows], [1..cols]
-        Pts = clamp(Pts, 1, rows);
-        Pbs = clamp(Pbs, 1, rows);
-        Pls = clamp(Pls, 1, cols);
-        Prs = clamp(Prs, 1, cols);
+        Pts = clamp(Pts, rows);
+        Pbs = clamp(Pbs, rows);
+        Pls = clamp(Pls, cols);
+        Prs = clamp(Prs, cols);
 
         // Normalize so that top <= bottom, left <= right
         if (Pbs < Pts) {
@@ -141,8 +139,8 @@ public class FillRectangularAreaHandler {
         }
     }
 
-    private int clamp(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(hi, v));
+    private int clamp(int v, int hi) {
+        return Math.max(1, Math.min(hi, v));
     }
 
     private String printable(char c) {

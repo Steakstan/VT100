@@ -53,9 +53,6 @@ public class TerminalApp extends Application {
     private final Object pauseCondition = new Object();
     private FileProcessingService fileProcessingService;
 
-    private static final Thread DUMMY_THREAD = new Thread(() -> {}) {
-        @Override public void interrupt() {/* no-op */}
-    };
     private volatile Thread processingThread = null;
 
     private String commentText = "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
@@ -210,9 +207,7 @@ public class TerminalApp extends Application {
                 .withKeepAlive(15_000, 3);
 
         sshManager.addDataListener(data ->
-                Platform.runLater(() -> {
-                    processInput(data.toCharArray());
-                })
+                Platform.runLater(() -> processInput(data.toCharArray()))
         );
 
         sshManager.connectAsync()
@@ -395,10 +390,6 @@ public class TerminalApp extends Application {
         this.processingThread = worker;
     }
 
-    public Thread getProcessingThread() {
-        return processingThread != null ? processingThread : DUMMY_THREAD;
-    }
-
     public boolean isStopped() {
         return isStopped.get();
     }
@@ -520,4 +511,5 @@ public class TerminalApp extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
 }

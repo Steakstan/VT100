@@ -41,7 +41,7 @@ public class LoginProfilesConfig {
             }
             return config;
         } catch (Exception e) {
-            System.err.println("Ошибка чтения конфигурации логин-профилей: " + e.getMessage());
+            System.err.println("Fehler beim Lesen der Anmeldeprofilkonfiguration: " + e.getMessage());
             return new LoginProfilesConfig();
         }
     }
@@ -53,7 +53,7 @@ public class LoginProfilesConfig {
             byte[] encrypted = encrypt(json.getBytes(StandardCharsets.UTF_8));
             fos.write(encrypted);
         } catch (Exception e) {
-            System.err.println("Ошибка сохранения конфигурации логин-профилей: " + e.getMessage());
+            System.err.println("Fehler beim Speichern der Anmeldeprofilkonfiguration: " + e.getMessage());
         }
     }
 

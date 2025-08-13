@@ -12,7 +12,7 @@ import java.util.Set;
 final class FontManager {
     private Font normalFont, boldFont;
     private double lastFontCellH = -1;
-    private String family;
+    private final String family;
 
     FontManager() {
         this.family = chooseFontFamily();

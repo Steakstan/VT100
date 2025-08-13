@@ -6,18 +6,15 @@ import java.util.Objects;
 
 /**
  * Utilities to parse and build canonical style strings used by the renderer.
- *
  * Canonical keys we care about:
  *  - fill
  *  - background
  *  - underline
  *  - font-weight
- *
  * Parsing:
  *  - Accepts multiple vendor/alias keys and normalizes them to canonical ones.
  *  - Unknown keys are preserved as-is (after trim) to allow extensibility (e.g., "blink", "line-double-width").
  *  - Robust against extra semicolons, whitespace, and entries without a colon.
- *
  * Building:
  *  - Produces a deterministic order: fill; background; underline; font-weight; then all other keys
  *    in insertion order.
@@ -89,7 +86,7 @@ public class StyleUtils {
         if (styleMap instanceof LinkedHashMap) {
             for (Map.Entry<String, String> e : styleMap.entrySet()) {
                 String k = e.getKey();
-                if (!isCanonical(k)) {
+                if (isCanonical(k)) {
                     append(sb, k, e.getValue());
                 }
             }
@@ -97,7 +94,7 @@ public class StyleUtils {
             // Fallback for non-linked maps: still append the rest, order unspecified
             for (Map.Entry<String, String> e : styleMap.entrySet()) {
                 String k = e.getKey();
-                if (!isCanonical(k)) {
+                if (isCanonical(k)) {
                     append(sb, k, e.getValue());
                 }
             }
@@ -124,9 +121,9 @@ public class StyleUtils {
 
     private static boolean isCanonical(String key) {
         for (String s : CANONICAL_ORDER) {
-            if (s.equals(key)) return true;
+            if (s.equals(key)) return false;
         }
-        return false;
+        return true;
     }
 
     private static void append(StringBuilder sb, String key, String value) {
@@ -141,38 +138,22 @@ public class StyleUtils {
     private static String normalizeKey(String rawKey) {
         String key = rawKey.toLowerCase();
 
-        switch (key) {
+        return switch (key) {
             // foreground color
-            case "-fx-fill":
-            case "text-fill":
-            case "color":
-            case "foreground":
-            case "fg":
-                return "fill";
+            case "-fx-fill", "text-fill", "color", "foreground", "fg" -> "fill";
 
             // background color
-            case "-rtfx-background-color":
-            case "-fx-background-color":
-            case "background-color":
-            case "bg":
-                return "background";
+            case "-rtfx-background-color", "-fx-background-color", "background-color", "bg" -> "background";
 
             // underline flag
-            case "-fx-underline":
-            case "underline":
-                return "underline";
+            case "-fx-underline", "underline" -> "underline";
 
             // font weight
-            case "-fx-font-weight":
-            case "weight":
-            case "fontweight":
-            case "font-weight":
-                return "font-weight";
-
-            default:
+            case "-fx-font-weight", "weight", "fontweight", "font-weight" -> "font-weight";
+            default ->
                 // Preserve unknown keys as-is (already lower-cased)
-                return key;
-        }
+                    key;
+        };
     }
 
     /**
@@ -182,17 +163,13 @@ public class StyleUtils {
         String value = Objects.toString(rawVal, "").trim();
         if (value.isEmpty()) return value;
 
-        switch (key) {
-            case "font-weight":
-                return normalizeFontWeight(value);
-
-            case "underline":
-                return normalizeBoolean(value) ? "true" : "false";
-
-            default:
+        return switch (key) {
+            case "font-weight" -> normalizeFontWeight(value);
+            case "underline" -> normalizeBoolean(value) ? "true" : "false";
+            default ->
                 // Pass-through for colors and unknown keys
-                return value;
-        }
+                    value;
+        };
     }
 
     /**
@@ -210,23 +187,11 @@ public class StyleUtils {
         }
 
         // Textual weights
-        switch (s) {
-            case "bold":
-            case "bolder":
-            case "semi-bold":
-            case "semibold":
-            case "demibold":
-            case "extra-bold":
-            case "extrabold":
-            case "heavy":
-            case "black":
-                return "bold";
-            case "normal":
-            case "regular":
-            case "book":
-            default:
-                return "normal";
-        }
+        return switch (s) {
+            case "bold", "bolder", "semi-bold", "semibold", "demibold", "extra-bold", "extrabold", "heavy", "black" ->
+                    "bold";
+            default -> "normal";
+        };
     }
 
     /**

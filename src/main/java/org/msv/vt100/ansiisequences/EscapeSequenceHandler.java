@@ -130,11 +130,7 @@ public class EscapeSequenceHandler {
             case "[?42l":
                 nrcsHandler.disableNrcsMode();
                 break;
-            case ">":
-                break;
-            case "[?68l":
-                break;
-            case "[2*x":
+            case ">", "[2*x", "[?68l", "#5":
                 break;
             case "[?69h":
                 leftRightMarginModeHandler.enableLeftRightMarginMode();
@@ -145,8 +141,6 @@ public class EscapeSequenceHandler {
             case "#6":
                 lineAttributeHandler.setDoubleWidthLine(cursor.getRow(),true);
                 logger.info("Doppelte Breite für Zeile {} gesetzt", cursor.getRow() + 1);
-                break;
-            case "#5":
                 break;
             default:
                 if (sequence.matches("\\[\\d+;\\d+r")) {

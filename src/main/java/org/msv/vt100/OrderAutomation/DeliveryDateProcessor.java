@@ -573,37 +573,6 @@ public class DeliveryDateProcessor {
     }
 
 
-
-
-    /*private void finalPosNrEnter() throws IOException, InterruptedException {
-        System.out.println("Warte auf Rückkehr zur Startseite oder auf 'Pos-Nr.:' bei 23,62.");
-
-        boolean zielErreicht = waitUntil("Startseite (3,11 / 3,24) oder 'Pos-Nr.:' bei 23,62", () -> {
-            terminalApp.checkForPause();
-            String cursorPosition = cursor.getCursorPosition();
-            String screenText = getScreenText();
-
-            boolean startseite = cursorPosition.equals("3,11") || cursorPosition.equals("3,24");
-            boolean posNrErkannt = screenTextDetector.isPosNrDisplayed()
-                    && cursorPosition.equals("23,62")
-                    && screenText.contains("Pos-Nr.:");
-
-            return startseite || posNrErkannt;
-        });
-
-        if (!zielErreicht) throw new IOException("Timeout beim Warten auf Rückkehr oder 'Pos-Nr.:'");
-
-        String cursorPosition = cursor.getCursorPosition();
-        getScreenText();
-
-        if (cursorPosition.equals("3,11") || cursorPosition.equals("3,24")) {
-            System.out.println("Zurück auf der Startseite erkannt. Überspringe.");
-        } else {
-            System.out.println("Erkannte Positionsanzeige. Sende Enter.");
-            sendDataWithDelay("\r");
-        }
-    }*/
-
     private String getScreenText() {
         try {
             java.lang.reflect.Method method = screenTextDetector.getClass().getMethod("getScreenText");

@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
  * Handles absolute cursor positioning:
  * - CUP:  CSI row;col H
  * - HVP:  CSI row;col f
- *
  * Semantics:
  * - row/col are 1-based; 0 or empty mean default 1.
  * - DECOM/DECVLRM effects are applied by CursorController, not here.
@@ -35,8 +34,8 @@ public class CursorMovementHandler {
      * Missing/zero parameters default to 1 (VT semantics).
      */
     public void handleCursorMovement(String sequence) {
-        int row1 = -1;
-        int col1 = -1;
+        int row1;
+        int col1;
 
         Matcher m = CUP_PATTERN.matcher(sequence);
         if (m.matches()) {

@@ -143,7 +143,7 @@ public class CursorController {
         }
 
         // Guard against out-of-bounds
-        if (isCursorInBounds()) return;
+        if (isCursorOutOfBounds()) return;
 
         // Skip ISO control characters (not printable)
         if (isControl(ch)) return;
@@ -167,7 +167,7 @@ public class CursorController {
     // ---- internals ----
 
     private void writeGlyphAndAdvance(String glyph) {
-        if (isCursorInBounds()) return;
+        if (isCursorOutOfBounds()) return;
 
         // Merge per-cell style (from current TextFormater) with per-line style.
         // IMPORTANT: Having a non-null textFormater here is what restores reverse video and other SGR effects.
@@ -203,10 +203,12 @@ public class CursorController {
         return s.codePoints().allMatch(Character::isISOControl);
     }
 
-    private boolean isCursorInBounds() {
+    private boolean isCursorOutOfBounds() {
         int r = cursor.getRow();
         int c = cursor.getColumn();
-        return r < 0 || r >= screenBuffer.getRows() || c < 0 || c >= screenBuffer.getColumns();
+        int rows = screenBuffer.getRows();
+        int columns = screenBuffer.getColumns();
+        return r < 0 || r >= rows || c < 0 || c >= columns;
     }
 
     private int clamp(int v, int hi) {

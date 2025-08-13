@@ -11,7 +11,6 @@ import java.util.Map;
  * Handles National Replacement Character Sets (NRCS).
  * VT terminals can map a small ASCII subset to national variants when NRCS is enabled.
  * This class performs a simple character-for-character replacement when enabled.
- *
  * Notes:
  * - NRCS is independent from DEC Special Graphics (handled elsewhere).
  * - If NRCS is disabled, input text is passed through unchanged.
@@ -77,28 +76,9 @@ public class NrcsHandler {
         return sb.toString();
     }
 
-    /**
-     * Processes a single character through NRCS mapping.
-     * Useful for hot paths where characters are emitted one-by-one.
-     */
-    public char processChar(char c) {
-        if (!nrcsEnabled) return c;
-        return mapChar(c);
-    }
 
-    /**
-     * Returns the current NRCS mode.
-     */
-    public NrcsMode getCurrentNrcsMode() {
-        return currentNrcsMode;
-    }
 
-    /**
-     * Returns whether NRCS translation is currently enabled.
-     */
-    public boolean isNrcsEnabled() {
-        return nrcsEnabled;
-    }
+
 
     // ---- Internals ----
 

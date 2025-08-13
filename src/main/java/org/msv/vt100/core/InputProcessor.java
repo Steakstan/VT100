@@ -16,7 +16,6 @@ public class InputProcessor {
 
     private static final char ESC = '\u001B';
     private static final char ST  = '\\';
-    private static final char BEL = '\u0007';
     private static final char CR  = '\r';
     private static final char LF  = '\n';
     private static final char BS  = '\b';
@@ -31,7 +30,6 @@ public class InputProcessor {
     private final CursorController cursorController;
     private final NrcsHandler nrcsHandler;
     private final CharsetSwitchHandler charsetSwitchHandler;
-    private final TextFormater textFormater;
     private final Runnable backspaceHandler;
     private enum Mode { TEXT, ESCAPE, DCS }
     private Mode mode = Mode.TEXT;
@@ -49,7 +47,6 @@ public class InputProcessor {
         this.cursorController = cursorController;
         this.nrcsHandler = nrcsHandler;
         this.charsetSwitchHandler = charsetSwitchHandler;
-        this.textFormater = textFormater;
         this.backspaceHandler = backspaceHandler;
         this.cursorController.attachTextPipeline(charsetSwitchHandler, nrcsHandler, textFormater);
     }
@@ -69,7 +66,6 @@ public class InputProcessor {
                             dcsBuf.setLength(0);
                             mode = Mode.TEXT;
                             i++;
-                            continue;
                         } else {
 
                             handleDcsSequence(dcsBuf);
@@ -77,7 +73,6 @@ public class InputProcessor {
                             mode = Mode.ESCAPE;
                             escBuf.setLength(0);
                             escBuf.append(ESC);
-                            continue;
                         }
                     } else {
                         dcsBuf.append(ch);
@@ -162,7 +157,7 @@ public class InputProcessor {
 
 
     private void handleDcsSequence(StringBuilder dcs) {
-        if (dcs.length() == 0) return;
+        if (dcs.isEmpty()) return;
         final int previewLen = Math.min(32, dcs.length());
         String head = printable(dcs.substring(0, previewLen));
         log.debug("DCS empfangen (Länge={}): Kopf='{}' ...", dcs.length(), head);
@@ -174,8 +169,6 @@ public class InputProcessor {
         String afterCharset = charsetSwitchHandler.processText(raw);
 
         String afterNrcs = nrcsHandler.processText(afterCharset);
-
-        String style = textFormater.getCurrentStyle();
 
         for (int off = 0; off < afterNrcs.length(); ) {
             int cp = afterNrcs.codePointAt(off);

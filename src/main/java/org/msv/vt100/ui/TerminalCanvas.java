@@ -183,7 +183,7 @@ public class TerminalCanvas extends Canvas {
             int ne = Math.min(rows - 1, end + 1);
 
             if (!bands.isEmpty()) {
-                int[] last = bands.get(bands.size() - 1);
+                int[] last = bands.getLast();
                 if (ns <= last[1] + 1) {
                     last[1] = Math.max(last[1], ne);
                 } else {

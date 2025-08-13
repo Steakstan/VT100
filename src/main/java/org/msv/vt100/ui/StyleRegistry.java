@@ -41,7 +41,7 @@ final class StyleRegistry {
         boolean underline =
                 "true".equalsIgnoreCase(m.getOrDefault("underline", "false")) ||
                         "underline".equalsIgnoreCase(
-                                m.getOrDefault("text-decoration", "").trim().toLowerCase()
+                                m.getOrDefault("text-decoration", "").trim()
                         );
 
         boolean bold = "bold".equalsIgnoreCase(m.getOrDefault("font-weight", "normal"));
@@ -67,12 +67,6 @@ final class StyleRegistry {
         styleIdCache.put(canon, newId);
         idToStyleKey.put(newId, sk);
         return newId;
-    }
-
-    StyleKey styleKeyById(int id) {
-        StyleKey sk = idToStyleKey.get(id);
-        if (sk != null) return sk;
-        return styleKeyFor(null);
     }
 
     static final class StyleKey {

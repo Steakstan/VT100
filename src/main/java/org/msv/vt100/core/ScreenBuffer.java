@@ -61,20 +61,8 @@ public class ScreenBuffer {
         Page p = page();
         for (int r = 0; r < rows; r++) {
             if (!p.dirtyRows[r]) continue;
-            // Копируем строку целиком (ячейки — неизменяемые record, копирование ссылок дёшево)
             System.arraycopy(p.backbuffer[r], 0, p.committed[r], 0, columns);
             p.dirtyRows[r] = false;
-        }
-    }
-
-    public void clearBackbuffer() {
-        Page p = page();
-        for (int r = 0; r < rows; r++) {
-            Cell[] rowArr = p.backbuffer[r];
-            for (int c = 0; c < columns; c++) {
-                rowArr[c] = DEFAULT_CELL;
-            }
-            p.dirtyRows[r] = true;
         }
     }
 
@@ -146,7 +134,6 @@ public class ScreenBuffer {
     private static boolean equalsCell(Cell a, Cell b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
-        // сравниваем и символ, и стиль
         return Objects.equals(a.character(), b.character()) &&
                 Objects.equals(a.style(), b.style());
     }
@@ -163,10 +150,4 @@ public class ScreenBuffer {
         }
     }
 
-    public Cell[] getVisibleRow(int row) {
-        if (row < 0 || row >= rows) {
-            throw new IndexOutOfBoundsException("Invalid row: " + row);
-        }
-        return page().committed[row];
-    }
 }

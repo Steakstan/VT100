@@ -20,10 +20,6 @@ public class ScreenTextDetector {
         return screenText.contains("Aenderungsauftrag vorhanden");
     }
 
-    public boolean isPosNrDisplayed() {
-        String screenText = screenBuffer.toString();
-        return screenText.contains("Pos-Nr.:");
-    }
     public String getScreenText() {
         return String.valueOf(screenBuffer);
     }

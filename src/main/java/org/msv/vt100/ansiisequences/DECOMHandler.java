@@ -8,12 +8,10 @@ import java.util.List;
 
 /**
  * Handles DEC Origin Mode (DECOM).
- *
  * Semantics:
  * - When DECOM is ON (CSI ?6h), the origin for CUP (cursor position) is the current scrolling region's
  *   top-left corner (and, if DECVLRM is active, the left margin).
  * - When DECOM is OFF (CSI ?6l), CUP is absolute relative to the full screen (top-left at 1,1).
- *
  * This class stores the current mode and notifies listeners on changes. It does not apply cursor math itself;
  * consumers (e.g., CursorController) should query {@link #isRelativeCursorMode()} and adapt positioning logic.
  */
@@ -39,16 +37,6 @@ public class DECOMHandler {
     /** Returns current DECOM state. */
     public boolean isRelativeCursorMode() {
         return relativeCursorMode;
-    }
-
-    /**
-     * Registers a listener invoked whenever DECOM state changes.
-     * Listener is called on the same thread that triggers the change.
-     */
-    public void addChangeListener(Runnable listener) {
-        if (listener != null) {
-            changeListeners.add(listener);
-        }
     }
 
     // ---- internals ----

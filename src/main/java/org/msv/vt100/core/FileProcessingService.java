@@ -38,7 +38,7 @@ public FileProcessingService(SSHManager sshManager,
 }
 
 public void processFile(int choice, String excelFilePath) throws InterruptedException {
-    logger.info("Excel-Datei wird geöffnet: {}", excelFilePath);;
+    logger.info("Excel-Datei wird geöffnet: {}", excelFilePath);
     isPaused.set(false);
     isStopped.set(false);
 

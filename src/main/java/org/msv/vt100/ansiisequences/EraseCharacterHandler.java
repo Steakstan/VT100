@@ -12,14 +12,12 @@ import java.util.regex.Pattern;
 
 /**
  * Handles ECH (Erase Character): CSI Pn X
- *
  * Semantics:
  * - Replaces Pn characters starting at the cursor position with spaces.
  * - Does NOT move the cursor.
  * - Honors DECVLRM horizontally: erasure is restricted to [leftMargin..rightMargin] when enabled.
  * - If Pn extends beyond the effective right boundary, it is clamped.
  * - Default Pn is 1 when omitted or non-positive.
- *
  * We erase using current background (effective), not default transparent style.
  */
 public class EraseCharacterHandler {

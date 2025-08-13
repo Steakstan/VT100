@@ -156,59 +156,67 @@ public class TextFormater {
      * Applies non-color SGR attributes. Returns true if handled.
      */
     private boolean applyBasicAttribute(int code) {
-        switch (code) {
-            case 1: // bold
+        return switch (code) {
+            case 1 -> {
                 enableBold();
-                return true;
-            case 2: // faint (map to not-bold if bold is not desired, here we keep bold unaffected)
+                yield true;
+            }
+            case 2 -> // faint (map to not-bold if bold is not desired, here we keep bold unaffected)
                 // Optional: implement faint as "font-weight: normal" unless bold set later
                 // For now, we ignore 'faint' to avoid conflicting semantics; could add a FAINT state.
-                return true;
-            case 3: // italic (not supported by current renderer)
+                    true;
+            case 3 -> // italic (not supported by current renderer)
                 // ignored
-                return true;
-            case 4: // underline
+                    true;
+            case 4, 21 -> {
                 enableUnderline();
-                return true;
-            case 5: // blink
+                yield true;
+            }
+            case 5 -> {
                 enableBlink();
-                return true;
-            case 7: // reverse video
+                yield true;
+            }
+            case 7 -> {
                 enableReverseVideo();
-                return true;
-            case 8: // conceal
+                yield true;
+            }
+            case 8 -> {
                 enableConceal();
-                return true;
-            case 21: // double underline -> treat as underline
-                enableUnderline();
-                return true;
-            case 22: // not bold, not faint
+                yield true;
+            }
+            case 22 -> {
                 disableBold();
-                return true;
-            case 23: // not italic
+                yield true;
+            }
+            case 23 -> // not italic
                 // ignored
-                return true;
-            case 24: // not underline
+                    true;
+            case 24 -> {
                 disableUnderline();
-                return true;
-            case 25: // not blink
+                yield true;
+            }
+            case 25 -> {
                 disableBlink();
-                return true;
-            case 27: // not reverse
+                yield true;
+            }
+            case 27 -> {
                 disableReverseVideo();
-                return true;
-            case 28: // reveal (cancel conceal)
+                yield true;
+            }
+            case 28 -> {
                 disableConceal();
-                return true;
-            case 39: // default foreground
+                yield true;
+            }
+            case 39 -> {
                 currentForeground = DEFAULT_FG;
-                return true;
-            case 49: // default background
+                yield true;
+            }
+            case 49 -> {
                 currentBackground = DEFAULT_BG;
-                return true;
-            default:
-                return false;
-        }
+                yield true;
+            }
+            default -> false;
+        };
     }
 
     /**
@@ -296,12 +304,11 @@ public class TextFormater {
         // we fallback to a solid color (black) for the new foreground to keep text visible.
         if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
             // Use a non-transparent surrogate for foreground after swap
-            String swapSourceBg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
-            String newFg = swapSourceBg; // text color comes from (effective) background
-            String newBg = effFg;        // background comes from previous foreground
+            // text color comes from (effective) background
+            // background comes from previous foreground
 
-            fg = newFg;
-            bg = newBg;
+            fg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
+            bg = effFg;
         }
 
         // Conceal overrides foreground regardless of reverse-video
@@ -332,9 +339,7 @@ public class TextFormater {
         String effFg = currentForeground != null ? currentForeground : DEFAULT_FG;
         String effBg = currentBackground != null ? currentBackground : DEFAULT_BG;
         if (activeFormats.contains(TextFormatMode.REVERSE_VIDEO)) {
-            String swapBg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
-            effBg = effFg;
-            effFg = swapBg;
+            effFg = "transparent".equalsIgnoreCase(effBg) ? REVERSE_SWAP_BG_FALLBACK : effBg;
         }
         if (activeFormats.contains(TextFormatMode.CONCEAL)) {
             effFg = "transparent";

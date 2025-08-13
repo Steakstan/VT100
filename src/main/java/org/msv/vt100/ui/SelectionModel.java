@@ -11,7 +11,7 @@ final class SelectionModel {
 
     void beginSelection(double x, double y, double cellWidth, double cellHeight, DirtyTracker dirty) {
         // vorher: clearSelectionInternal(false, dirty);
-        clearSelectionInternal(true, dirty); // alte Auswahlbereiche invalidieren
+        clearSelectionInternal(dirty); // alte Auswahlbereiche invalidieren
 
         selectionStartCol = (int) (x / cellWidth);
         selectionStartRow = (int) (y / cellHeight);
@@ -56,11 +56,11 @@ final class SelectionModel {
     }
 
     void clearSelection(DirtyTracker dirty) {
-        clearSelectionInternal(true, dirty);
+        clearSelectionInternal(dirty);
     }
 
-    private void clearSelectionInternal(boolean markDirty, DirtyTracker dirty) {
-        if (markDirty && selectionStartRow != null && selectionEndRow != null) {
+    private void clearSelectionInternal(DirtyTracker dirty) {
+        if (selectionStartRow != null && selectionEndRow != null) {
             dirty.markSelectionRangeDirty(selectionStartRow, selectionEndRow);
         }
         selectionStartRow = selectionStartCol = null;
@@ -78,7 +78,7 @@ final class SelectionModel {
 
     void selectWordAt(double x, double y, double cellWidth, double cellHeight,
                       ScreenBuffer screenBuffer, DirtyTracker dirty) {
-        clearSelectionInternal(true, dirty);
+        clearSelectionInternal(dirty);
         int col = (int) (x / cellWidth);
         int row = (int) (y / cellHeight);
         int cols = screenBuffer.getColumns();
@@ -102,7 +102,7 @@ final class SelectionModel {
     }
 
     void selectRowAt(double y, double cellHeight, ScreenBuffer screenBuffer, DirtyTracker dirty) {
-        clearSelectionInternal(true, dirty);
+        clearSelectionInternal(dirty);
         int row = (int) (y / cellHeight);
         if (row < 0 || row >= screenBuffer.getRows()) return;
         selectionStartRow = row; selectionEndRow = row;

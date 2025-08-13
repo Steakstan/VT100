@@ -24,7 +24,7 @@ public class CursorVisibilityManager {
     private boolean enabled = false;
 
     /** Whether blinking behavior is active. */
-    private boolean blinking = true;
+    private final boolean blinking = true;
 
     /** Current on/off phase when blinking is enabled. */
     private boolean blinkPhaseOn = true;
