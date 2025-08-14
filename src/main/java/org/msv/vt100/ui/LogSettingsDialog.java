@@ -26,10 +26,15 @@ public class LogSettingsDialog {
     private final Preferences prefs;
     private final TextField logPathField;
     private final CheckBox enableLoggingCheckBox;
+    private final TextField deliveryLogPathField;
+    private final CheckBox enableDeliveryLoggingCheckBox;
 
     private static final String PREF_LOG_PATH = "logPath";
     private static final String PREF_LOG_ENABLED = "logEnabled";
+    private static final String PREF_DELIVERY_LOG_PATH = "deliveryLogPath";
+    private static final String PREF_DELIVERY_LOG_ENABLED = "deliveryLogEnabled";
     private static final String DEFAULT_LOG_PATH = "C:\\Users\\Documents";
+    private static final String DEFAULT_DELIVERY_LOG_PATH = "C:\\Users\\Documents";
 
     public LogSettingsDialog(TerminalApp terminalApp) {
         this.terminalApp = terminalApp;
@@ -90,6 +95,37 @@ public class LogSettingsDialog {
         HBox enableBox = new HBox(5, enableLabel, enableLoggingCheckBox);
         enableBox.setAlignment(Pos.CENTER_LEFT);
 
+        Label deliveryPathLabel = new Label("Delivery Log Path:");
+        deliveryPathLabel.getStyleClass().add("dialog-label-turquoise");
+
+        deliveryLogPathField = new TextField();
+        deliveryLogPathField.getStyleClass().add("dialog-text-field");
+        deliveryLogPathField.setText(prefs.get(PREF_DELIVERY_LOG_PATH, DEFAULT_DELIVERY_LOG_PATH));
+
+        Button deliveryBrowseButton = new Button("Browse");
+        deliveryBrowseButton.getStyleClass().add("dialog-button");
+        deliveryBrowseButton.setOnAction(e -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle("Select Delivery Log Directory");
+            File dir = chooser.showDialog(dialog);
+            if (dir != null) {
+                deliveryLogPathField.setText(dir.getAbsolutePath());
+            }
+        });
+
+        HBox deliveryPathBox = new HBox(5, deliveryLogPathField, deliveryBrowseButton);
+        deliveryPathBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label enableDeliveryLabel = new Label("Enable Delivery Logging:");
+        enableDeliveryLabel.getStyleClass().add("dialog-label-turquoise");
+
+        enableDeliveryLoggingCheckBox = new CheckBox();
+        enableDeliveryLoggingCheckBox.setSelected(prefs.getBoolean(PREF_DELIVERY_LOG_ENABLED, false));
+
+        HBox enableDeliveryBox = new HBox(5, enableDeliveryLabel, enableDeliveryLoggingCheckBox);
+        enableDeliveryBox.setAlignment(Pos.CENTER_LEFT);
+
+
         Button saveButton = new Button("Save");
         saveButton.getStyleClass().add("dialog-button");
         saveButton.setOnAction(e -> saveSettings());
@@ -105,19 +141,23 @@ public class LogSettingsDialog {
         grid.add(pathBox, 1, 0);
         grid.add(enableLabel, 0, 1);
         grid.add(enableLoggingCheckBox, 1, 1);
-        grid.add(buttonBox, 1, 2);
+        grid.add(deliveryPathLabel, 0, 2);
+        grid.add(deliveryPathBox, 1, 2);
+        grid.add(enableDeliveryLabel, 0, 3);
+        grid.add(enableDeliveryLoggingCheckBox, 1, 3);
+        grid.add(buttonBox, 1, 4);
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);
         root.setCenter(grid);
 
-        Rectangle clip = new Rectangle(540, 180);
+        Rectangle clip = new Rectangle(580, 260);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
         root.setClip(clip);
 
-        Scene scene = new Scene(root, 540, 180);
+        Scene scene = new Scene(root, 580, 260);
         scene.setFill(Color.TRANSPARENT);
         scene.getStylesheets().addAll(
                 Objects.requireNonNull(getClass().getResource("/org/msv/vt100/ui/styles/base.css")).toExternalForm(),
@@ -133,16 +173,27 @@ public class LogSettingsDialog {
     private void saveSettings() {
         String logPath = logPathField.getText().trim();
         boolean loggingEnabled = enableLoggingCheckBox.isSelected();
+        String deliveryLogPath = deliveryLogPathField.getText().trim();
+        boolean deliveryLoggingEnabled = enableDeliveryLoggingCheckBox.isSelected();
 
         prefs.put(PREF_LOG_PATH, logPath);
         prefs.putBoolean(PREF_LOG_ENABLED, loggingEnabled);
+        prefs.put(PREF_DELIVERY_LOG_PATH, deliveryLogPath);
+        prefs.putBoolean(PREF_DELIVERY_LOG_ENABLED, deliveryLoggingEnabled);
 
         System.setProperty("LOG_PATH", logPath);
+        System.setProperty("DELIVERY_LOG_PATH", deliveryLogPath);
 
         if (loggingEnabled) {
             terminalApp.enableLogging();
         } else {
             terminalApp.disableLogging();
+        }
+
+        if (deliveryLoggingEnabled) {
+            terminalApp.enableDeliveryLogging();
+        } else {
+            terminalApp.disableDeliveryLogging();
         }
 
         dialog.close();

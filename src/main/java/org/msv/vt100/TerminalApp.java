@@ -59,6 +59,7 @@ public class TerminalApp extends Application {
     private boolean shouldWriteComment = true;
 
     private boolean isLoggingEnabled = false;
+    private boolean isDeliveryLoggingEnabled = false;
 
     private volatile boolean repaintRequested = true;
     private boolean lastCursorVisible = false;
@@ -413,10 +414,6 @@ public class TerminalApp extends Application {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
-        if (rootLogger.getAppender("FILE") != null) {
-            return;
-        }
-
         String defaultPath = Path.of(System.getProperty("user.home"), "logs", "app.log").toString();
         String logPath = System.getProperty("LOG_PATH", defaultPath);
 
@@ -429,6 +426,15 @@ public class TerminalApp extends Application {
         File parentDir = finalLogFile.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
+        }
+
+        if (parentDir != null && System.getProperty("DELIVERY_LOG_PATH") == null) {
+            File deliveryLogFile = new File(parentDir, "delivery.log");
+            System.setProperty("DELIVERY_LOG_PATH", deliveryLogFile.getAbsolutePath());
+        }
+
+        if (rootLogger.getAppender("FILE") != null) {
+            return;
         }
 
         FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
@@ -448,6 +454,9 @@ public class TerminalApp extends Application {
         rootLogger.addAppender(fileAppender);
     }
 
+
+
+
     private void removeFileAppender() {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         ch.qos.logback.classic.Logger rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
@@ -459,11 +468,82 @@ public class TerminalApp extends Application {
         }
     }
 
+    private void addDeliveryFileAppender() {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger deliveryLogger = loggerContext.getLogger("org.msv.vt100.OrderAutomation");
+
+        if (deliveryLogger.getAppender("DELIVERY_FILE") != null) {
+            return;
+        }
+
+        String defaultPath = Path.of(System.getProperty("user.home"), "logs", "delivery.log").toString();
+        String logPath = System.getProperty("DELIVERY_LOG_PATH", defaultPath);
+
+        File logFile = new File(logPath);
+        if (logFile.isDirectory()) {
+            logPath = new File(logFile, "delivery.log").getAbsolutePath();
+        }
+
+        File finalLogFile = new File(logPath);
+        File parentDir = finalLogFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
+        FileAppender<ILoggingEvent> fileAppender = new FileAppender<>();
+        fileAppender.setName("DELIVERY_FILE");
+        fileAppender.setContext(loggerContext);
+        fileAppender.setFile(logPath);
+        fileAppender.setAppend(true);
+
+        PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+        encoder.setContext(loggerContext);
+        encoder.setPattern("%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n");
+        encoder.start();
+
+        fileAppender.setEncoder(encoder);
+        fileAppender.start();
+
+        deliveryLogger.addAppender(fileAppender);
+    }
+
+    private void removeDeliveryFileAppender() {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger deliveryLogger = loggerContext.getLogger("org.msv.vt100.OrderAutomation");
+
+        Appender<ILoggingEvent> fileAppender = deliveryLogger.getAppender("DELIVERY_FILE");
+        if (fileAppender != null) {
+            deliveryLogger.detachAppender(fileAppender);
+            fileAppender.stop();
+        }
+    }
+
     private void setLoggingLevel(Level level) {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         ch.qos.logback.classic.Logger rootLogger =
                 loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
         rootLogger.setLevel(level);
+    }
+
+    private void setDeliveryLoggingLevel(Level level) {
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger deliveryLogger = loggerContext.getLogger("org.msv.vt100.OrderAutomation");
+        deliveryLogger.setLevel(level);
+    }
+
+
+    public void enableDeliveryLogging() {
+        isDeliveryLoggingEnabled = true;
+        addDeliveryFileAppender();
+        setDeliveryLoggingLevel(Level.DEBUG);
+        logger.info("Delivery Logging aktiviert.");
+    }
+
+    public void disableDeliveryLogging() {
+        isDeliveryLoggingEnabled = false;
+        removeDeliveryFileAppender();
+        setDeliveryLoggingLevel(Level.OFF);
+        logger.info("Delivery Logging deaktiviert.");
     }
 
 
@@ -511,5 +591,14 @@ public class TerminalApp extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
+    public boolean isLoggingEnabled() {
+        return isLoggingEnabled;
+    }
+
+    public boolean isDeliveryLoggingEnabled() {
+        return isDeliveryLoggingEnabled;
+    }
+
 
 }
