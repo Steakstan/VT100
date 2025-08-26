@@ -244,7 +244,8 @@ public class BearbeitungseinstellungenDialog {
                 });
             } catch (InterruptedException ie) {
                 Platform.runLater(() -> {
-                    new Alert(Alert.AlertType.INFORMATION, "Verarbeitung gestoppt.", ButtonType.OK).showAndWait();
+                    TerminalDialog.showInfo("Verarbeitung gestoppt.",
+                            terminalApp.getUIController().getPrimaryStage());
                     terminalApp.hideProcessingButtons();
                 });
                 Thread.currentThread().interrupt();

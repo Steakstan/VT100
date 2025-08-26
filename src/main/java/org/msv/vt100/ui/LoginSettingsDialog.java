@@ -171,7 +171,6 @@ public class LoginSettingsDialog {
         String password = passwordField.getText();
 
         if (profileName.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            new Alert(Alert.AlertType.ERROR, "Bitte füllen Sie alle Felder aus.", ButtonType.OK).showAndWait();
             return;
         }
 

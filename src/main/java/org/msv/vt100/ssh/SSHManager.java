@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 
-public class SSHManager {
+public class SSHManager implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(SSHManager.class);
 
 
@@ -234,12 +234,33 @@ public class SSHManager {
     }
 
     private void shutdownExecutors() {
-        readerExecutor.shutdownNow();
-        connectExecutor.shutdownNow();
+        shutdownExecutor(readerExecutor, "readerExecutor");
+        shutdownExecutor(connectExecutor, "connectExecutor");
     }
 
     private static void closeQuietly(Closeable c) {
         if (c == null) return;
         try { c.close(); } catch (IOException ignore) {}
+    }
+
+    private void shutdownExecutor(ExecutorService executor, String name) {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                logger.warn("{} did not terminate in time, forcing shutdown", name);
+                executor.shutdownNow();
+            } else {
+                logger.debug("{} terminated successfully", name);
+            }
+        } catch (InterruptedException e) {
+            logger.warn("{} termination interrupted", name);
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Override
+    public void close() {
+        disconnect();
     }
 }

@@ -41,9 +41,9 @@ public class DeliveryDateProcessor {
         log.info("START processDeliveryDate: starting order processing from Excel.");
 
         ExcelOrderData orderData = ExcelOrderData.fromExcelRow(row, indices);
-        String orderNumber = orderData.orderNumber();
-        String positionNumber = orderData.positionNumber();
-        String deliveryDate = orderData.deliveryDate();
+        String orderNumber        = orderData.orderNumber();
+        String positionNumber     = orderData.positionNumber();
+        String deliveryDate       = orderData.deliveryDate();
         String confirmationNumber = orderData.confirmationNumber();
         boolean hasConfirmationCol = indices.confirmationCol() >= 0;
 
@@ -53,7 +53,7 @@ public class DeliveryDateProcessor {
         long t0 = System.nanoTime();
         boolean moved = navigateToStartPage();
         if (moved) {
-            waitForStartPageStable(); // только если реально навигировали
+            waitForStartPageStable();
         }
         long t1 = System.nanoTime();
         log.debug("Timing: toStart={}ms", (t1 - t0) / 1_000_000);
@@ -67,57 +67,61 @@ public class DeliveryDateProcessor {
         }
         sshConnector.send(orderNumber + "\r");
 
-        boolean weFilialeScreenDetected = false;
-
-        if (waitForPositionPromptFast()) {
-            log.info("Sende Positionsnummer: {}", positionNumber);
-            sshConnector.send(positionNumber + "\r");
-
-            Thread.sleep(70);
-            String initialScreen = getScreenText();
-            if (initialScreen.contains("Keine Bestellware")) {
-                log.info("INFO: 'Keine Bestellware' erkannt – warte bis die Meldung verschwindet.");
-                while (getScreenText().contains("Keine Bestellware")) {
-                    Thread.sleep(200);
-                }
-                log.info("INFO: 'Keine Bestellware' verschwunden – breche Verarbeitung dieses Auftrags ab.");
-                navigateToStartPage();
-                return;
-            }
-
-            Thread.sleep(70);
-
-            String screen = getScreenText();
-            String cursorPos = cursor.getCursorPosition();
-
-            if (cursorPos.equals("24,80") && screen.contains("Bitte ausloesen")) {
-                log.info("Detected 'Bitte ausloesen' — starting ENTER loop.");
-                while (cursor.getCursorPosition().equals("24,80") && getScreenText().contains("Bitte ausloesen")) {
-                    sshConnector.send("\r");
-                    Thread.sleep(200);
-                }
-                log.info("'Bitte ausloesen' verschwunden oder Cursor verschoben.");
-                screen = getScreenText();
-                cursorPos = cursor.getCursorPosition();
-            }
-
-            weFilialeScreenDetected = cursorPos.equals("9,36") && screen.contains("Vorgesehene WE-Filiale");
+        if (!waitForPositionPromptFast()) {
+            throw new IOException("Timeout beim Warten auf Positionsprompt");
         }
 
-        String screenTextAfterPosition = getScreenText();
-        if (screenTextDetector.isWareneingangDisplayed() || screenTextAfterPosition.contains("Eingangsrechnung")) {
+        log.info("Sende Positionsnummer: {}", positionNumber);
+        sshConnector.send(positionNumber + "\r");
+
+        boolean postPosSeen = waitUntil("Post-Position state",
+                () -> {
+                    terminalApp.checkForPause();
+                    String c = cursor.getCursorPosition();
+                    String s = getScreenText();
+                    return s.contains("Keine Bestellware")
+                            || (c.equals("24,80") && s.contains("Bitte ausloesen"))
+                            || (c.equals("9,36")  && s.contains("Vorgesehene WE-Filiale"))
+                            || screenTextDetector.isWareneingangDisplayed()
+                            || s.contains("Eingangsrechnung")
+                            || (c.equals("13,74") && s.contains("OK (J/N/L/T/G)"));
+                });
+        if (!postPosSeen) {
+            throw new IOException("Timeout nach Eingabe der Positionsnummer (kein sinnvolles Zustand)");
+        }
+
+        if (getScreenText().contains("Keine Bestellware")) {
+            log.info("INFO: 'Keine Bestellware' erkannt – warte bis die Meldung verschwindet.");
+            waitUntil("'Keine Bestellware' verschwindet",
+                    () -> {
+                        terminalApp.checkForPause();
+                        return !getScreenText().contains("Keine Bestellware");
+                    });
+            log.info("INFO: 'Keine Bestellware' verschwunden – breche Verarbeitung dieses Auftrags ab.");
+            navigateToStartPage();
+            return;
+        }
+
+        if (resolveBitteAusloesenIfPresent()) {
+            log.info("'Bitte ausloesen' wurde bereinigt (Helper).");
+        }
+        String afterPos = getScreenText();
+        if (screenTextDetector.isWareneingangDisplayed() || afterPos.contains("Eingangsrechnung")) {
             log.info("INFO: Bestellung wurde bereits geliefert. Verarbeitung wird abgebrochen.");
             navigateToStartPage();
             return;
         }
 
-        if (!weFilialeScreenDetected) {
+        if (cursor.getCursorPosition().equals("13,74") && getScreenText().contains("OK (J/N/L/T/G)")) {
             if (!waitForOkPromptAndCompareDate(deliveryDate)) {
+
                 return;
             }
         }
 
+
         waitForDeliveryDateInputPrompt(deliveryDate);
+
         waitForBestellTerminWarningsToDisappear();
 
         handleFinalInputSequence(deliveryDate, confirmationNumber, hasConfirmationCol);
@@ -125,18 +129,16 @@ public class DeliveryDateProcessor {
         log.info("-----------------------------------------------------");
     }
 
+
     private void ensureOrderFieldSmart(String orderNumber) throws IOException, InterruptedException {
         if (orderNumber == null || orderNumber.isEmpty()) return;
 
         String screenText = getScreenText();
-        boolean is5 = orderNumber.length() == 5; // Lagerbestellung
-        boolean is6 = orderNumber.length() == 6; // Kaufauftrag
+        boolean is5 = orderNumber.length() == 5;
+        boolean is6 = orderNumber.length() == 6;
         boolean hasAufNr = screenText.contains("Auf-Nr");
         boolean hasLbNr  = screenText.contains("LB-Nr");
-        boolean switched = false;
 
-
-        // Нужно переключиться в режим Lagerbestellung
         if (is5 && hasAufNr) {
             log.info("Umschalte auf Lagerbestellung (L)...");
             sendDataWithDelay("L\r");
@@ -152,7 +154,7 @@ public class DeliveryDateProcessor {
     }
 
     private void waitForStartPageStable() throws InterruptedException {
-        final long deadline = System.nanoTime() + 300_000_000L; // 300ms max
+        final long deadline = System.nanoTime() + 300_000_000L;
         String prev = captureStartAnchors();
         String prevCur = cursor.getCursorPosition();
 
@@ -164,7 +166,6 @@ public class DeliveryDateProcessor {
             String curCur  = cursor.getCursorPosition();
             String text    = getScreenText();
 
-            // на стартовой и два подряд одинаковых среза «якорей»
             if (isStartPage(text, curCur) && curCur.equals(prevCur) && curSnap.equals(prev)) {
                 log.debug("Startseite stabil bestätigt (anchors).");
                 return;
@@ -196,7 +197,7 @@ public class DeliveryDateProcessor {
         }
 
         String existingRaw = CellValueExtractor.extractCells(terminalApp.getScreenBuffer(), 9, 37, 38, 39, 40).trim();
-        String existingDigits = existingRaw.replaceAll("[^0-9]", ""); // только цифры
+        String existingDigits = existingRaw.replaceAll("[^0-9]", "");
         boolean dateMissing = existingDigits.length() < 2;
 
         if (dateMissing) {
@@ -231,58 +232,79 @@ public class DeliveryDateProcessor {
 
 
 
-    private void handleBitteAusloesenLoop() throws IOException, InterruptedException {
-        log.info("Starte Schleife für 'Bitte ausloesen'.");
+    private boolean resolveBitteAusloesenIfPresent() throws InterruptedException, IOException {
+        terminalApp.checkForPause();
 
-        boolean erkannt = waitUntil("Cursor = 24,80 & Text enthält 'Bitte ausloesen'", () -> {
-            terminalApp.checkForPause();
-            String cursorPosition = cursor.getCursorPosition();
-            String screenText = getScreenText();
-            log.debug("[DEBUG] Cursor bei 'Bitte ausloesen'-Prüfung: {};", cursorPosition, screenText);
-            return cursorPosition.equals("24,80") && screenText.contains("Bitte ausloesen");
-        });
-
-        if (!erkannt) {
-            log.info("INFO: 'Bitte ausloesen' nicht erkannt.");
-            return;
+        String c0 = cursor.getCursorPosition();
+        String s0 = getScreenText();
+        boolean present = c0.equals("24,80") && s0.contains("Bitte ausloesen");
+        if (!present) {
+            log.info("INFO: 'Bitte ausloesen' nicht gefunden.");
+            return false;
         }
 
-        while (true) {
-            terminalApp.checkForPause();
-            String before = getScreenText();
-            String cursorBefore = cursor.getCursorPosition();
+        long hardDeadline = System.nanoTime() + 180_000_000_000L;
+        long idleDeadline = System.nanoTime() + 3_000_000_000L;
 
-            if (cursorBefore.equals("24,80") && before.contains("Bitte ausloesen")) {
-                log.info("Sende Enter (ausloesen-Schleife).");
-                sendDataWithDelay("\r");
+        while (System.nanoTime() < hardDeadline) {
+            String beforeSnap = captureScrollRegionSnapshot();
+            String beforeCur  = cursor.getCursorPosition();
 
-                boolean changed = waitUntil("Bildschirm ändert sich nach Enter", () -> {
-                    terminalApp.checkForPause();
-                    return !getScreenText().equals(before);
-                });
+            sshConnector.send("\r");
 
-                if (!changed) {
-                    log.info("Bildschirm hat sich nicht geändert. Breche aus Schleife aus.");
-                    break;
-                }
+            boolean reacted = waitUntil("Reaktion auf ENTER bei 'Bitte ausloesen'", () -> {
+                terminalApp.checkForPause();
+                String afterS   = getScreenText();
+                String afterC   = cursor.getCursorPosition();
+                String afterSnap= captureScrollRegionSnapshot();
+                boolean disappeared = !(afterC.equals("24,80") && afterS.contains("Bitte ausloesen"));
+                boolean changed     = !afterSnap.equals(beforeSnap) || !afterC.equals(beforeCur);
+                return disappeared || changed;
+            });
 
-                boolean verschwunden = waitUntil("'Bitte ausloesen' verschwunden", () -> {
-                    terminalApp.checkForPause();
-                    String after = getScreenText();
-                    String currentCursor = cursor.getCursorPosition();
-                    return !after.contains("Bitte ausloesen") || !currentCursor.equals("24,80");
-                });
+            if (!reacted) break;
 
-                if (verschwunden) {
-                    log.info("'Bitte ausloesen' verschwunden.");
-                    break;
-                }
-            } else {
-                log.info("'Bitte ausloesen' nicht mehr sichtbar.");
+            String nowS = getScreenText();
+            String nowC = cursor.getCursorPosition();
+            if (!(nowC.equals("24,80") && nowS.contains("Bitte ausloesen"))) {
+                break;
+            }
+
+            String nowSnap = captureScrollRegionSnapshot();
+            boolean progressed = !nowSnap.equals(beforeSnap) || !nowC.equals(beforeCur);
+            if (progressed) {
+                idleDeadline = System.nanoTime() + 3_000_000_000L;
+            } else if (System.nanoTime() > idleDeadline) {
                 break;
             }
         }
+
+        waitUntil("Der nächste Zustand nach Ausloesen", () -> {
+            terminalApp.checkForPause();
+            String c = cursor.getCursorPosition();
+            String s = getScreenText();
+            return (c.equals("9,36")  && s.contains("Vorgesehene WE-Filiale"))
+                    || (c.equals("13,74") && s.contains("OK (J/N/L/T/G)"))
+                    || (s.contains("Eingaben OK") &&
+                    (c.equals("23,75") || c.equals("23,76") || c.equals("23,77") || c.equals("23,78")))
+                    || (c.equals("22,2") && s.contains("Interner Text"))
+                    || screenTextDetector.isWareneingangDisplayed()
+                    || s.contains("Eingangsrechnung");
+        });
+
+        return true;
     }
+
+    private String captureScrollRegionSnapshot() {
+        StringBuilder sb = new StringBuilder(9 * 80);
+        for (int row = 14; row <= 22; row++) {
+            for (int col = 0; col < 80; col++) {
+                sb.append(terminalApp.getScreenBuffer().getCell(row, col).character());
+            }
+        }
+        return sb.toString();
+    }
+
 
     private void waitForDeliveryDateInputPrompt(String deliveryDate) throws IOException, InterruptedException {
         log.info("Warte auf 'Vorgesehene WE-Filiale' oder 'Bitte ausloesen'…");
@@ -295,14 +317,7 @@ public class DeliveryDateProcessor {
                     || (c.equals("9,36") && s.contains("Vorgesehene WE-Filiale"));
         });
 
-        if (cursor.getCursorPosition().equals("24,80") && getScreenText().contains("Bitte ausloesen")) {
-            log.info("'Bitte ausloesen' erkannt — ENTER-Loop starten.");
-            while (cursor.getCursorPosition().equals("24,80") && getScreenText().contains("Bitte ausloesen")) {
-                sshConnector.send("\r");
-                Thread.sleep(200);
-            }
-            log.info("'Bitte ausloesen' verschwunden oder Cursor verschoben.");
-        }
+        resolveBitteAusloesenIfPresent();
 
         boolean success = waitUntil("Cursor = 9,36 & Text enthält 'Vorgesehene WE-Filiale'", () -> {
             terminalApp.checkForPause();
@@ -343,7 +358,7 @@ public class DeliveryDateProcessor {
 
         waitForErfassenAbNummer(confirmationNumber, hasConfirmationCol);
         waitForCursorAt960();
-        checkForBitteAusloesenNach960();
+        resolveBitteAusloesenIfPresent();
 
         if (shouldWriteComment()) {
             waitForEingabenOkPromptAndSendZ();
@@ -397,56 +412,56 @@ public class DeliveryDateProcessor {
         sshConnector.send("\r");
     }
 
-    private void checkForBitteAusloesenNach960() throws IOException, InterruptedException {
-        log.info("Прüfe nach 9,60 auf nächste Eingabeaufforderung...");
 
-        AusloeserStatus status = waitForAusloeserOderAlternative();
-        log.info("Status nach 9,60: {}", status);
+    private void waitForEingabenOkPromptAndSendZ() throws IOException, InterruptedException {
+        log.info("Warte auf 'Eingaben OK' (mit Abfang 'Bitte ausloesen').");
 
-        switch (status) {
-            case BITTE_AUSLOESEN:
-                log.info("'Bitte ausloesen' erkannt. Starte ENTER-Loop.");
-                while (cursor.getCursorPosition().equals("24,80") && getScreenText().contains("Bitte ausloesen")) {
-                    sshConnector.send("\r");
-                    Thread.sleep(200);
-                }
-                log.info("'Bitte ausloesen' verschwunden oder Cursor verschoben.");
-                break;
+        while (true) {
+            boolean seen = waitUntil(
+                    "Eingaben OK ODER Bitte ausloesen ODER Interner Text",
+                    () -> {
+                        terminalApp.checkForPause();
+                        String c = cursor.getCursorPosition();
+                        String s = getScreenText();
+                        boolean eingabenOk = s.contains("Eingaben OK") &&
+                                (c.equals("23,75") || c.equals("23,76") || c.equals("23,77") || c.equals("23,78"));
+                        boolean ausloesen  = c.equals("24,80") && s.contains("Bitte ausloesen");
+                        boolean interner   = c.equals("22,2")  && s.contains("Interner Text");
+                        return eingabenOk || ausloesen || interner;
+                    }
+            );
 
-            case EINGABEN_OK:
-                log.info("'Eingaben OK' erkannt – weiter ohne ENTER-Loop.");
-                break;
+            if (!seen) {
+                throw new IOException("Timeout beim Warten auf 'Eingaben OK' / 'Bitte ausloesen' / 'Interner Text'");
+            }
 
-            case INTERNE_EINGABE:
-                log.info("'Interner Text' erkannt – sende Enter für Kommentar-Eingabe.");
+            String c = cursor.getCursorPosition();
+            String s = getScreenText();
+
+            if (c.equals("24,80") && s.contains("Bitte ausloesen")) {
+                log.info("'Bitte ausloesen' vor 'Z' erkannt — bereinige...");
+                resolveBitteAusloesenIfPresent();
+                continue;
+            }
+
+            if (c.equals("22,2") && s.contains("Interner Text")) {
+                log.info("'Interner Text' erschien vor 'Z' — 'Z' überspringen.");
+                return;
+            }
+
+            if (s.contains("Eingaben OK") &&
+                    (c.equals("23,75") || c.equals("23,76") || c.equals("23,77") || c.equals("23,78"))) {
+                log.info("Bedingung erfüllt. Sende 'Z'.");
+                sendDataWithDelay("Z");
                 sshConnector.send("\r");
                 Thread.sleep(200);
-                break;
+                return;
+            }
 
-            default:
-                log.info("Unbekannter Status ({}). Weiter ohne spezielle Aktion.", status);
+            log.debug("Unerwarteter Zustand vor 'Z': c={}, text sample len={}", c, s.length());
         }
     }
 
-    private void waitForEingabenOkPromptAndSendZ() throws IOException, InterruptedException {
-        log.info("Warte auf 'Eingaben OK' und Cursorposition 23,75–23,78.");
-
-        boolean success = waitUntil("Eingaben OK & Cursor zwischen 23,75–23,78", () -> {
-            terminalApp.checkForPause();
-            String cursorPosition = cursor.getCursorPosition();
-            String screenText = getScreenText();
-            log.debug("[DEBUG] Cursor: {};", cursorPosition, screenText);
-            return screenText.contains("Eingaben OK") &&
-                    (cursorPosition.equals("23,75") || cursorPosition.equals("23,76") || cursorPosition.equals("23,77") || cursorPosition.equals("23,78"));
-        });
-
-        if (!success) throw new IOException("Timeout beim Warten auf Eingaben OK für 'Z'");
-
-        log.info("Bedingung erfüllt. Sende 'Z'.");
-        sendDataWithDelay("Z");
-        sshConnector.send("\r");
-        Thread.sleep(500);
-    }
 
     private void waitForInternerTextAndComment(String deliveryDate) throws IOException, InterruptedException {
         log.info("Warte auf 'Interner Text' oder 'Bitte ausloesen'...");
@@ -456,7 +471,7 @@ public class DeliveryDateProcessor {
         while (status == AusloeserStatus.BITTE_AUSLOESEN) {
             log.info("'Bitte ausloesen' erkannt. Sende Enter und warte erneut...");
             sshConnector.send("\r");
-            Thread.sleep(500);
+            Thread.sleep(200);
             status = waitForAusloeserOderAlternative();
         }
 
@@ -466,7 +481,7 @@ public class DeliveryDateProcessor {
 
         log.info("'Interner Text' erkannt. Sende Enter.");
         sshConnector.send("\r");
-        Thread.sleep(500);
+        Thread.sleep(200);
 
         boolean nummerErkannt = waitUntil("Dreistellige Nummer in Zeile 22 erkannt", () -> {
             terminalApp.checkForPause();
@@ -486,14 +501,14 @@ public class DeliveryDateProcessor {
     }
 
     private void waitForTextKZandOQSequence() throws IOException, InterruptedException {
-        log.info("Warte auf 'Text-KZ' bei Cursorposition 22,74–22,78.");
+        log.info("Warte auf 'Text-KZ' bei Cursorposition 22,73–22,78.");
 
-        boolean textKZPrompt = waitUntil("Cursor 22,74–78 & 'Text-KZ' erkannt", () -> {
+        boolean textKZPrompt = waitUntil("Cursor 22,73–78 & 'Text-KZ' erkannt", () -> {
             terminalApp.checkForPause();
             String c = cursor.getCursorPosition();
             String s = getScreenText();
             return s.contains("Text-KZ") &&
-                    (c.equals("22,74") || c.equals("22,75") || c.equals("22,76") || c.equals("22,77") || c.equals("22,78"));
+                    (c.equals("22,73") ||c.equals("22,74") || c.equals("22,75") || c.equals("22,76") || c.equals("22,77") || c.equals("22,78"));
         });
 
         if (!textKZPrompt) throw new IOException("Timeout bei der ersten 'Text-KZ'-Eingabe");
@@ -526,23 +541,37 @@ public class DeliveryDateProcessor {
     }
 
     private void finalEingabenOkEnter() throws IOException, InterruptedException {
-        log.info("Warte auf 'Eingaben OK' bei Cursorposition 23,75–23,78.");
+        log.info("Warte auf 'Eingaben OK' bei Cursorposition 23,75–23,78 ODER 'Bitte ausloesen'.");
 
-        boolean okErkannt = waitUntil("'Eingaben OK' + Cursor bei 23,75–23,78", () -> {
-            terminalApp.checkForPause();
-            String screenText = getScreenText();
-            String cursorPosition = cursor.getCursorPosition();
-            return screenText.contains("Eingaben OK") &&
-                    (cursorPosition.equals("23,75") || cursorPosition.equals("23,76") || cursorPosition.equals("23,77") || cursorPosition.equals("23,78"));
-        });
+        while (true) {
+            boolean gesehen = waitUntil("'Eingaben OK' oder 'Bitte ausloesen'", () -> {
+                terminalApp.checkForPause();
+                String s = getScreenText();
+                String c = cursor.getCursorPosition();
+                boolean ok = s.contains("Eingaben OK") &&
+                        (c.equals("23,75") || c.equals("23,76") || c.equals("23,77") || c.equals("23,78"));
+                boolean ausloesen = c.equals("24,80") && s.contains("Bitte ausloesen");
+                return ok || ausloesen;
+            });
 
-        if (!okErkannt) throw new IOException("Timeout beim Warten auf finalen Eingaben-OK-Prompt");
+            if (!gesehen) throw new IOException("Timeout beim Warten auf finalen Eingaben-OK-Prompt oder 'Bitte ausloesen'");
 
-        log.info("Erkannt. Sende Enter.");
-        sshConnector.send("\r");
+            String s = getScreenText();
+            String c = cursor.getCursorPosition();
 
-        handlePossiblePostOkPositionPrompt();
+            if (c.equals("24,80") && s.contains("Bitte ausloesen")) {
+                log.info("'Bitte ausloesen' vor finalem OK erkannt — bereinige...");
+                resolveBitteAusloesenIfPresent();
+                continue;
+            }
+
+            log.info("Erkannt. Sende Enter.");
+            sshConnector.send("\r");
+            handlePossiblePostOkPositionPrompt();
+            return;
+        }
     }
+
 
     private void handlePossiblePostOkPositionPrompt() throws IOException, InterruptedException {
         log.info("Überprüfung auf nachträgliche 'Pos-Nr.:' bei Cursor 23,62 oder Rückkehr zur Startseite.");
@@ -588,8 +617,8 @@ public class DeliveryDateProcessor {
         log.info("Warte auf Bildschirm für Positionsnummer-Eingabe (fast).");
 
         final long tStart      = System.nanoTime();
-        final long earlyNudge  = tStart + 120_000_000L;   // 120 ms
-        final long deadline    = tStart + 320_000_000L; //  320 ms
+        final long earlyNudge  = tStart + 120_000_000L;
+        final long deadline    = tStart + 320_000_000L;
         boolean nudged = false;
 
         while (System.nanoTime() < deadline) {
@@ -604,7 +633,7 @@ public class DeliveryDateProcessor {
                 return true;
             }
 
-            // Ранний «пинок», если всё ещё стартовая
+
             if (!nudged && System.nanoTime() >= earlyNudge && isStartPage(txt, cur)) {
                 log.debug("Still Startseite after ~120ms → Early Nudge Enter.");
                 sshConnector.send("\r");
@@ -613,15 +642,14 @@ public class DeliveryDateProcessor {
 
             if (!nudged && ("3,11".equals(cur) || "3,16".equals(cur) || "3,24".equals(cur))) {
                 log.debug("Zwischenzustand ({}). Instant Nudge Enter.", cur);
-                sshConnector.send("\r"); // без sleep'ов
+                sshConnector.send("\r");
                 nudged = true;
-                continue; // сразу продолжить цикл — быстрее увидим Pos-Prompt
+                continue;
             }
 
             Thread.sleep(15);
         }
 
-        // Мини-фоллбэк: один Enter и короткое ожидание именно ПО УСЛОВИЮ isPosPrompt(...)
         log.warn("Fast-Path miss. Mini-Fallback Enter...");
         sshConnector.send("\r");
         return waitUntil("Pos-Prompt (Mini-Fallback)", () -> {

@@ -85,7 +85,7 @@ public class TerminalApp extends Application {
                 } finally {
 
                     Platform.exit();
-                    System.exit(0);
+                    
                 }
             });
 
@@ -196,10 +196,12 @@ public class TerminalApp extends Application {
 
     private void connectWithConfig(SSHConfig config) {
         if (sshManager != null && sshManager.isConnected()) {
-            try {
-                sshManager.disconnect();
+            try (SSHManager ignored = sshManager) {
+                // Auto-close previous connection
             } catch (Exception e) {
                 logger.warn("Fehler beim Trennen der vorherigen Verbindung: {}", e.getMessage());
+            } finally {
+                sshManager = null;
             }
         }
 
@@ -240,7 +242,12 @@ public class TerminalApp extends Application {
 
     public void disconnectConnection() {
         if (sshManager != null && sshManager.isConnected()) {
-            sshManager.disconnect();
+            try (SSHManager ignored = sshManager) {
+            } catch (Exception e) {
+                logger.warn("Fehler beim Trennen der Verbindung: {}", e.getMessage());
+            } finally {
+                sshManager = null;
+            }
             processInput("Die Verbindung wurde abgebrochen\r".toCharArray());
         }
     }
@@ -297,9 +304,14 @@ public class TerminalApp extends Application {
 
         try {
             if (sshManager != null && sshManager.isConnected()) {
-                sshManager.disconnect();
+                try (SSHManager ignored = sshManager) {
+                    // Auto-close SSH connection
+                }
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        } finally {
+            sshManager = null;
+        }
     }
 
     private void updateScreenIfNeeded() {
@@ -591,14 +603,5 @@ public class TerminalApp extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-
-    public boolean isLoggingEnabled() {
-        return isLoggingEnabled;
-    }
-
-    public boolean isDeliveryLoggingEnabled() {
-        return isDeliveryLoggingEnabled;
-    }
-
 
 }

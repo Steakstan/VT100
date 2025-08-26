@@ -41,7 +41,6 @@ final class TerminalRenderer {
                 double x = start * cellWidth;
                 double w = (c - start) * cellWidth;
 
-                // жёсткий снап по X, +оверскан по Y
                 double x0 = Math.floor(x);
                 double x1 = Math.ceil(x + w);
 

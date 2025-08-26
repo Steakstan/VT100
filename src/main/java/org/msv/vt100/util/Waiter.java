@@ -10,7 +10,6 @@ public class Waiter {
                     Math.max(2, Runtime.getRuntime().availableProcessors()/2),
                     r -> { Thread t = new Thread(r, "waiter-scheduler"); t.setDaemon(true); return t; }
             );
-    public static void shutdown() { scheduler.shutdownNow(); }
 
     public static CompletableFuture<Void> waitFor(BooleanSupplier condition, Duration timeout, Duration interval) {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -36,7 +35,7 @@ public class Waiter {
     }
 
     public static CompletableFuture<Void> waitFor(BooleanSupplier condition) {
-        return waitFor(condition, Duration.ofSeconds(5), Duration.ofMillis(25)); // опрос каждые ~25 мс
+        return waitFor(condition, Duration.ofSeconds(5), Duration.ofMillis(25));
     }
 
     public static boolean waitUntil(String debugText, Callable<Boolean> condition) throws InterruptedException {
