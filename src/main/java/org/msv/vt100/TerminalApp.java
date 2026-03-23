@@ -42,6 +42,7 @@ public class TerminalApp extends Application {
     private TextFormater textFormater;
     private ScreenTextDetector screenTextDetector;
     private InputProcessor inputProcessor;
+    //private final OrderPrivacyMasker orderPrivacyMasker = new OrderPrivacyMasker();
 
     private UIController uiController;
 
@@ -328,6 +329,7 @@ public class TerminalApp extends Application {
     }
 
     void updateScreen() {
+        // orderPrivacyMasker.apply(screenBuffer);
         screenBuffer.commit();
         TerminalCanvas canvas = uiController.getTerminalCanvas();
         canvas.setCursorPosition(cursor.getRow(), cursor.getColumn());
@@ -335,7 +337,7 @@ public class TerminalApp extends Application {
         canvas.updateScreen();
     }
 
-
+    
     public void showProcessingButtons() {
         uiController.getContentPanel().showProcessingButtons();
         logger.debug("Processing-Schaltflächen angezeigt");
@@ -540,6 +542,12 @@ public class TerminalApp extends Application {
     private void setDeliveryLoggingLevel(Level level) {
         LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
         ch.qos.logback.classic.Logger deliveryLogger = loggerContext.getLogger("org.msv.vt100.OrderAutomation");
+
+
+
+        
+
+        
         deliveryLogger.setLevel(level);
     }
 
@@ -602,6 +610,15 @@ public class TerminalApp extends Application {
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    private volatile boolean forceDeliveryDateOverride = false;
+
+    public boolean isForceDeliveryDateOverride() {
+        return forceDeliveryDateOverride;
+    }
+    public void setForceDeliveryDateOverride(boolean v) {
+        this.forceDeliveryDateOverride = v;
     }
 
 }

@@ -22,6 +22,7 @@ import java.util.prefs.Preferences;
 public class BearbeitungseinstellungenDialog {
 
     private static final String PREF_LAST_DIR = "be_last_dir";
+    private static final String PREF_FORCE_KW = "be_force_kw"; // NEU: Persistenz für Force-KW
     private static final int MAX_COMMENT_LEN = 49;
     private static final String DEFAULT_COMMENT =
             "DEM HST NACH WIRD DIE WARE IN KW ** ZUGESTELLT";
@@ -37,6 +38,9 @@ public class BearbeitungseinstellungenDialog {
     private TextField filePathField;
     private CheckBox commentCheckBox;
     private TextField commentField;
+
+    // NEU: UI-Checkbox für den Toggle
+    private CheckBox forceKwCheckBox;
 
     public BearbeitungseinstellungenDialog(TerminalApp terminalApp) {
         this.terminalApp = Objects.requireNonNull(terminalApp, "terminalApp");
@@ -142,6 +146,26 @@ public class BearbeitungseinstellungenDialog {
         commentBox.getStyleClass().add("comment-box-background");
         commentBox.setAlignment(Pos.CENTER_LEFT);
 
+        // --- NEU: Checkbox für "Excel-Lieferdatum erzwingen (KW-Override)" ---
+        forceKwCheckBox = new CheckBox("Excel-Lieferdatum erzwingen (KW-Override)");
+        forceKwCheckBox.getStyleClass().add("dialog-label-turquoise");
+
+        // Initialwert aus Preferences, falls nicht vorhanden: App-Status spiegeln
+        boolean prefForce = prefs.getBoolean(PREF_FORCE_KW, false);
+        boolean initForce = prefForce;
+        try {
+            initForce = terminalApp.isForceDeliveryDateOverride();
+        } catch (Exception ignored) { /* falls Getter noch nicht existiert */ }
+        forceKwCheckBox.setSelected(initForce);
+
+        Tooltip forceKwTip = new Tooltip(
+                "Wenn aktiviert, wird die KW aus der Tabelle IMMER übernommen –\n" +
+                        "unabhängig von der bereits im Terminal stehenden KW."
+        );
+        forceKwTip.getStyleClass().add("custom-tooltip");
+        Tooltip.install(forceKwCheckBox, forceKwTip);
+        // --- ENDE NEU ---
+
         Button startButton = new Button("Verarbeitung starten");
         startButton.getStyleClass().add("dialog-button");
         startButton.setOnAction(e -> startProcessing());
@@ -157,19 +181,21 @@ public class BearbeitungseinstellungenDialog {
         grid.add(fileLabel, 0, 1);
         grid.add(fileBox, 1, 1);
         grid.add(commentBox, 1, 2);
-        grid.add(buttonBox, 1, 3);
+        grid.add(forceKwCheckBox, 1, 3); // NEU: eigene Zeile für den Toggle
+        grid.add(buttonBox, 1, 4);       // Buttons nach unten verschoben
 
         BorderPane root = new BorderPane();
         root.getStyleClass().add("root-dialog");
         root.setTop(header);
         root.setCenter(grid);
 
-        Rectangle clip = new Rectangle(530, 300);
+        // Höhe leicht erhöht wegen neuer Zeile
+        Rectangle clip = new Rectangle(530, 360);
         clip.setArcWidth(30);
         clip.setArcHeight(30);
         root.setClip(clip);
 
-        Scene scene = new Scene(root, 530, 300);
+        Scene scene = new Scene(root, 530, 360);
         scene.setFill(Color.TRANSPARENT);
         addStylesheetIfExists(scene, "/org/msv/vt100/ui/styles/base.css");
         addStylesheetIfExists(scene, "/org/msv/vt100/ui/styles/buttons.css");
@@ -228,6 +254,13 @@ public class BearbeitungseinstellungenDialog {
 
         final boolean shouldWriteComment = commentCheckBox.isSelected();
         final String commentText = shouldWriteComment ? commentField.getText().trim() : "";
+
+        // NEU: Toggle aus UI übernehmen + persistieren
+        final boolean forceKw = forceKwCheckBox.isSelected();
+        try {
+            terminalApp.setForceDeliveryDateOverride(forceKw);
+        } catch (Exception ignored) { /* falls Setter noch nicht existiert */ }
+        prefs.putBoolean(PREF_FORCE_KW, forceKw);
 
         terminalApp.setShouldWriteComment(shouldWriteComment);
         terminalApp.setCommentText(commentText);

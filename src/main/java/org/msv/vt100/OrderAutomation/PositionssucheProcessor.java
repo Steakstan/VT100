@@ -187,10 +187,10 @@ public class PositionssucheProcessor {
                 terminalApp.checkForPause();
                 if (terminalApp.isStopped()) return resultRowIndex;
 
-                String cellFirm = CellValueExtractor.extractCells(buffer, line, 4, 5, 6, 7);
+                String cellFirm = CellValueExtractor.extractCells(buffer, line,  5, 6, 7, 8);
                 for (String firm : firmNumbers) {
                     if (cellFirm.equals(firm)) {
-                        String position = CellValueExtractor.extractCells(buffer, line, 0, 1, 2, 3);
+                        String position = CellValueExtractor.extractCells(buffer, line, 1, 2, 3,4);
                         String key = firm + "_" + position;
                         Row existingRow = processedRows.get(key);
                         if (existingRow == null) {
@@ -201,7 +201,7 @@ public class PositionssucheProcessor {
                                 writeRow22(newRow, buffer, defaultCellStyle, firm, order, position);
                                 sendDataWithDelay("\r");
                                 Thread.sleep(70);
-                                String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
+                                String modelNumber = CellValueExtractor.extractCells(screenBuffer, 7,  23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,42);
                                 Cell cellModel = newRow.createCell(4);
                                 cellModel.setCellValue(modelNumber);
                                 cellModel.setCellStyle(defaultCellStyle);
@@ -249,9 +249,9 @@ public class PositionssucheProcessor {
         Cell cellPosition = row.createCell(2);
         cellPosition.setCellValue(position);
         cellPosition.setCellStyle(defaultCellStyle);
-        String modelDescription = CellValueExtractor.extractCells(buffer, 22, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String deliveryDate = CellValueExtractor.extractCells(buffer, 22, 63, 64, 65, 66);
-        String abLiefertermin = CellValueExtractor.extractCells(buffer, 22, 55, 56, 57, 58);
+        String modelDescription = CellValueExtractor.extractCells(buffer, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,42);
+        String deliveryDate = CellValueExtractor.extractCells(buffer, 22, 64, 65, 66,67);
+        String abLiefertermin = CellValueExtractor.extractCells(buffer, 22, 56, 57, 58,59);
         Cell cellDesc = row.createCell(3);
         cellDesc.setCellValue(modelDescription);
         cellDesc.setCellStyle(defaultCellStyle);
@@ -273,10 +273,10 @@ public class PositionssucheProcessor {
         Cell cellPosition = row.createCell(2);
         cellPosition.setCellValue(position);
         cellPosition.setCellStyle(defaultCellStyle);
-        String modelDescription = CellValueExtractor.extractCells(buffer, line, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String modelNumber = CellValueExtractor.extractCells(buffer, line + 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String deliveryDate = CellValueExtractor.extractCells(buffer, line, 63, 64, 65, 66);
-        String abLiefertermin = CellValueExtractor.extractCells(buffer, line, 55, 56, 57, 58);
+        String modelDescription = CellValueExtractor.extractCells(buffer, line, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42);
+        String modelNumber = CellValueExtractor.extractCells(buffer, line + 1, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42);
+        String deliveryDate = CellValueExtractor.extractCells(buffer, line, 64, 65, 66, 67);
+        String abLiefertermin = CellValueExtractor.extractCells(buffer, line, 56, 57, 58,59);
         Cell cellDesc = row.createCell(3);
         cellDesc.setCellValue(modelDescription);
         cellDesc.setCellStyle(defaultCellStyle);
@@ -292,9 +292,9 @@ public class PositionssucheProcessor {
     }
 
     private void updateRow22(Row row, ScreenBuffer buffer, CellStyle defaultCellStyle) {
-        String modelDescription = CellValueExtractor.extractCells(buffer, 22, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String deliveryDate = CellValueExtractor.extractCells(buffer, 22, 63, 64, 65, 66);
-        String abLiefertermin = CellValueExtractor.extractCells(buffer, 22, 55, 56, 57, 58);
+        String modelDescription = CellValueExtractor.extractCells(buffer, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42);
+        String deliveryDate = CellValueExtractor.extractCells(buffer, 22, 64, 65, 66, 67);
+        String abLiefertermin = CellValueExtractor.extractCells(buffer, 22, 56, 57, 58, 59);
         Cell cellDesc = row.getCell(3);
         if (cellDesc == null) {
             cellDesc = row.createCell(3);
@@ -316,10 +316,10 @@ public class PositionssucheProcessor {
     }
 
     private void updateNormalRow(Row row, ScreenBuffer buffer, int line, CellStyle defaultCellStyle) {
-        String modelDescription = CellValueExtractor.extractCells(buffer, line, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String modelNumber = CellValueExtractor.extractCells(buffer, line + 1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41);
-        String deliveryDate = CellValueExtractor.extractCells(buffer, line, 63, 64, 65, 66);
-        String abLiefertermin = CellValueExtractor.extractCells(buffer, line, 55, 56, 57, 58);
+        String modelDescription = CellValueExtractor.extractCells(buffer, line,  23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42);
+        String modelNumber = CellValueExtractor.extractCells(buffer, line + 1, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42);
+        String deliveryDate = CellValueExtractor.extractCells(buffer, line, 64, 65, 66, 67);
+        String abLiefertermin = CellValueExtractor.extractCells(buffer, line, 56, 57, 58, 59);
         Cell cellDesc = row.getCell(3);
         if (cellDesc == null) {
             cellDesc = row.createCell(3);
