@@ -511,6 +511,9 @@ public class TerminalApp extends Application {
         fileAppender.setAppend(true);
 
         PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+
+
+
         encoder.setContext(loggerContext);
         encoder.setPattern("%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n");
         encoder.start();
